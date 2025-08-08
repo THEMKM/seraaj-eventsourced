@@ -1,0 +1,4 @@
+/contracts/ @architect
+/services/applications/ @applications-team
+/services/matching/ @matching-team
+/infrastructure/ @platform-team

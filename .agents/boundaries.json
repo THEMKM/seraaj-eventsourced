@@ -1,0 +1,32 @@
+{
+  "agents": {
+    "CONTRACT_ARCHITECT": {
+      "allowed_paths": ["contracts/**"],
+      "checkpoint_file": "contracts.done"
+    },
+    "GENERATOR": {
+      "allowed_paths": ["tools/generators/**", "services/shared/**", "frontend/src/types/**"],
+      "checkpoint_file": "generation.done"
+    },
+    "SERVICE_BUILDER_APPLICATIONS": {
+      "allowed_paths": ["services/applications/**"],
+      "checkpoint_file": "applications.done"
+    },
+    "SERVICE_BUILDER_MATCHING": {
+      "allowed_paths": ["services/matching/**"],
+      "checkpoint_file": "matching.done"
+    },
+    "SERVICE_BUILDER_VOLUNTEERS": {
+      "allowed_paths": ["services/volunteers/**"],
+      "checkpoint_file": "volunteers.done"
+    },
+    "ORCHESTRATOR": {
+      "allowed_paths": ["bff/**", "infrastructure/**"],
+      "checkpoint_file": "orchestration.done"
+    },
+    "VALIDATOR": {
+      "allowed_paths": ["tests/**", "tools/validators/**"],
+      "checkpoint_file": "validation.done"
+    }
+  }
+}
