@@ -1,6 +1,19 @@
 {
   "timestamp": "2025-08-09T00:30:44.405528Z",
   "contracts_checksum": "9dfb1704a24a84cba68a7dc44963f07e1f8ad401abee7ae9203429adfaebe8d5",
-  "generated": ["packages/sdk-bff", "packages/sdk-bff/.contracts_checksum"],
-  "notes": "BFF TypeScript SDK generated and contracts checksum stamped"
+  "generated": [
+    "packages/sdk-bff", 
+    "packages/sdk-bff/.contracts_checksum",
+    "packages/sdk-bff/.codegen_versions.json",
+    "services/shared/models.py",
+    "frontend/src/types/entities.ts"
+  ],
+  "hardening_applied": {
+    "deterministic_tool_versions": true,
+    "provenance_stamping": true,
+    "contracts_checksum_verification": true,
+    "stale_file_removal": true,
+    "no_deep_import_escape_hatches": true
+  },
+  "notes": "BFF TypeScript SDK hardened with deterministic generation, provenance stamps, and verifiable checksums"
 }

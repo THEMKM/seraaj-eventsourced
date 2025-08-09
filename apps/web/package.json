@@ -7,7 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "echo 'Lint check - HTTP restrictions enforced'",
+    "lint": "eslint .",
     "type-check": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
@@ -24,10 +24,11 @@
     "postcss": "^8.4.41",
     "autoprefixer": "^10.4.19",
     "typescript": "^5.5.0",
-    "eslint": "^9.7.0",
-    "@eslint/js": "^9.7.0",
-    "@typescript-eslint/parser": "^8.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.0.0",
-    "@next/eslint-plugin-next": "^14.2.5"
+    "eslint": "^8.57.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "eslint-config-next": "^14.2.5",
+    "@next/eslint-plugin-next": "^14.2.5",
+    "eslint-plugin-boundaries": "^4.2.2"
   }
 }

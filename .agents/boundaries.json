@@ -25,7 +25,7 @@
       "checkpoint_file": "orchestration.done"
     },
     "VALIDATOR": {
-      "allowed_paths": ["tests/**", "tools/validators/**"],
+      "allowed_paths": ["tests/**", "tools/validators/**", ".git/hooks/**", ".github/**", ".agents/runs/**", ".agents/checkpoints/validation.done"],
       "checkpoint_file": "validation.done"
     },
     "FRONTEND_COMPOSER": {

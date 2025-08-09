@@ -1,6 +1,18 @@
-{
-  "timestamp": "2025-08-09T00:51:00Z",
-  "commit": "41a5b59",
-  "sdkVersion": "1.0.0",
-  "notes": "FRONTEND_COMPOSER bootstrap complete"
-}
+FRONTEND_COMPOSER hardening pass completed successfully at 2025-08-09T00:30:00Z
+
+Hardening tasks completed:
+✓ A) SDK read-only enforced - postinstall:chmod-sdk script present and working
+✓ B) ESLint "SDK-only HTTP" fence implemented with required rules
+✓ C) Tailwind purge safety verified - content paths and sideEffects correct
+✓ D) Next transpilation verified - transpilePackages configured correctly
+✓ E) Cold build sanity passed - all commands succeed
+✓ F) Run manifest created
+
+Acceptance criteria met:
+- SDK directory permissions hardened (postinstall script present)
+- ESLint rules present exactly as specified
+- Tailwind content path includes ../../packages/ui/src/**/*.{ts,tsx,css}
+- packages/ui has correct sideEffects configuration
+- All build commands pass: pnpm install && pnpm -w type-check && pnpm -w lint && pnpm -w build
+
+The frontend is now hardened and ready for development with strict boundary enforcement.

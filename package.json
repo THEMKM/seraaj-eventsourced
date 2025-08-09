@@ -7,16 +7,19 @@
     "generate": "make generate",
     "test:contracts": "jest tests/contracts",
     "checkpoint": "make checkpoint",
+    "postinstall:chmod-sdk": "chmod -R a-w packages/sdk-bff || true",
     "dev:web": "pnpm --filter @seraaj/web dev",
     "build:web": "pnpm --filter @seraaj/web build",
     "lint": "pnpm -r lint",
-    "type-check": "pnpm -r type-check"
+    "type-check": "pnpm -r type-check",
+    "build": "pnpm -r build"
   },
   "devDependencies": {
     "ajv-cli": "^5.0.0",
-    "@openapitools/openapi-generator-cli": "^2.7.0",
+    "@openapitools/openapi-generator-cli": "2.7.0",
+    "openapi-generator-cli": "1.0.0",
     "quicktype": "^23.0.0",
-    "@redocly/cli": "^1.0.0",
+    "@redocly/cli": "1.16.0",
     "typescript": "^5.5.0",
     "eslint": "^9.7.0",
     "eslint-plugin-boundaries": "^4.2.2",

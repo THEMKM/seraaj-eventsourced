@@ -26,7 +26,16 @@
       "Bash(rm:*)",
       "Bash(pnpm -w build)",
       "Bash(pnpm build:*)",
-      "Bash(git rev-parse:*)"
+      "Bash(git rev-parse:*)",
+      "Bash(node:*)",
+      "Bash(pnpm run:*)",
+      "Bash(chmod:*)",
+      "Bash(git commit:*)",
+      "Bash(git reset:*)",
+      "Bash(bash:*)",
+      "Bash(timeout 10 curl -s http://localhost:8000/api/health)",
+      "Bash(taskkill:*)",
+      "Bash(copy main_simple.py main.py)"
     ],
     "deny": []
   }

@@ -4,7 +4,7 @@ import json
 import hashlib
 import shutil
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Optional
 from datetime import datetime
 
 class CodeGenerator:
@@ -80,8 +80,8 @@ class CodeGenerator:
                     self._generate_state_machine(workflow_file.stem, workflow)
                     
     def generate_bff_ts_sdk(self):
-        """Generate TS SDK for BFF into packages/sdk-bff and stamp checksum."""
-        print("Generating BFF TypeScript SDK...")
+        """Generate deterministic, provenance-stamped BFF TypeScript SDK."""
+        print("Generating BFF TypeScript SDK with hardening...")
         
         tmp = Path('.tmp')
         tmp.mkdir(exist_ok=True)
@@ -92,31 +92,65 @@ class CodeGenerator:
             return
             
         bff_bundled = tmp / 'bff.bundled.yaml'
-        
-        # 1) Bundle/dereference
-        try:
-            subprocess.run(['npx', '@redocly/cli', 'bundle', str(bff_src), 
-                          '--dereferenced', '-o', str(bff_bundled)], check=True)
-        except subprocess.CalledProcessError:
-            print("WARNING: Failed to bundle OpenAPI spec, using manual generation")
-            return
-            
-        # SDK already created manually, just stamp checksum
         out = Path('packages/sdk-bff')
-        if not out.exists():
-            print("WARNING: SDK directory not found")
+        
+        # Remove ALL stale files from SDK directory before regeneration (except package.json)
+        if out.exists():
+            print("Removing stale SDK files...")
+            for item in out.iterdir():
+                if item.name not in ['package.json', '.gitignore']:
+                    if item.is_dir():
+                        shutil.rmtree(item)
+                    else:
+                        item.unlink()
+        else:
+            out.mkdir(parents=True, exist_ok=True)
+            
+        # 1) Bundle/dereference with Redocly (deterministic version)
+        try:
+            subprocess.run(['npx', '@redocly/cli@1.16.0', 'bundle', str(bff_src), 
+                          '--dereferenced', '-o', str(bff_bundled)], check=True)
+            print("OpenAPI spec bundled with Redocly v1.16.0")
+        except subprocess.CalledProcessError as e:
+            print(f"WARNING: Failed to bundle OpenAPI spec: {e}")
+            bff_bundled = bff_src
+            
+        # 2) Generate TypeScript SDK using openapi-generator v7.6.0
+        try:
+            subprocess.run([
+                'npx', '@openapitools/openapi-generator-cli@2.13.4', 'generate',
+                '-i', str(bff_bundled),
+                '-g', 'typescript-fetch',
+                '-o', str(out),
+                '--generator-version=7.6.0',
+                '--additional-properties=typescriptThreePlus=true,modelPropertyNaming=camelCase,enumPropertyNaming=UPPERCASE',
+                '--skip-validate-spec'
+            ], check=True)
+            print("TypeScript SDK generated with openapi-generator v7.6.0")
+        except subprocess.CalledProcessError as e:
+            print(f"ERROR: Failed to generate TypeScript SDK: {e}")
             return
             
-        # Stamp checksum
+        # 3) Write deterministic codegen versions stamp
+        codegen_versions = {
+            "openapiGenerator": "7.6.0",
+            "redoclyCli": "1.16.0",
+            "generatedAt": datetime.utcnow().isoformat() + "Z"
+        }
+        (out / '.codegen_versions.json').write_text(json.dumps(codegen_versions, indent=2))
+        print("Wrote .codegen_versions.json provenance stamp")
+        
+        # 4) Stamp contracts checksum for verifiable traceability
         lock_path = Path('contracts/version.lock')
         if lock_path.exists():
             with open(lock_path) as f:
                 lock_data = json.load(f)
             checksum = lock_data.get('checksum', '')
             (out / '.contracts_checksum').write_text(checksum)
-            print(f'SUCCESS: Generated @seraaj/sdk-bff with checksum: {checksum[:12]}...')
+            print(f'Wrote .contracts_checksum: {checksum[:12]}...')
+            print(f'SUCCESS: Generated deterministic @seraaj/sdk-bff')
         else:
-            print("WARNING: contracts/version.lock not found")
+            print("ERROR: contracts/version.lock not found - cannot verify traceability")
                     
     def _generate_state_machine(self, name: str, workflow: dict):
         """Generate Python state machine from workflow JSON"""
@@ -186,6 +220,44 @@ class {class_name}StateMachine:
             
         return checksum
         
+    def create_run_manifest(self, checksum: str):
+        """Create a generator run manifest with tool versions and provenance"""
+        timestamp = datetime.utcnow().isoformat() + "Z"
+        manifest = {
+            "timestamp": timestamp,
+            "agent": "GENERATOR",
+            "contracts_checksum": checksum,
+            "tool_versions": {
+                "openapiGenerator": "7.6.0",
+                "redoclyCli": "1.16.0",
+                "datamodelCodegen": "0.25.0",
+                "quicktype": "latest"
+            },
+            "commands_executed": [
+                "datamodel-codegen --input contracts/v1.0.0/entities --output services/shared/models.py",
+                "quicktype contracts/v1.0.0/entities -o frontend/src/types/entities.ts",
+                "npx @redocly/cli@1.16.0 bundle contracts/v1.0.0/api/bff.openapi.yaml",
+                "npx @openapitools/openapi-generator-cli@2.13.4 generate -g typescript-fetch"
+            ],
+            "inputs": [
+                "contracts/v1.0.0/entities/",
+                "contracts/v1.0.0/api/bff.openapi.yaml",
+                "contracts/v1.0.0/workflows/"
+            ],
+            "outputs": [
+                "services/shared/models.py",
+                "frontend/src/types/entities.ts",
+                "packages/sdk-bff/",
+                "packages/sdk-bff/.contracts_checksum",
+                "packages/sdk-bff/.codegen_versions.json"
+            ]
+        }
+        
+        # Write manifest to runs directory
+        run_manifest_path = Path(f".agents/runs/GENERATOR/{timestamp.replace(':', '-')}.json")
+        run_manifest_path.write_text(json.dumps(manifest, indent=2))
+        print(f"Run manifest created: {run_manifest_path}")
+        
     def run(self):
         """Execute all generation tasks"""
         self.verify_contracts_complete()
@@ -195,6 +267,9 @@ class {class_name}StateMachine:
         self.generate_state_machines()
         self.generate_bff_ts_sdk()
         checksum = self.calculate_checksum()
+        
+        # Create run manifest
+        self.create_run_manifest(checksum)
         
         # Create generation checkpoint
         checkpoint_file = self.checkpoints_dir / "generation.done"

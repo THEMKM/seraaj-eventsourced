@@ -1,0 +1,37 @@
+{
+  "timestamp": "2025-08-09T00:30:44.405528Z",
+  "agent": "GENERATOR",
+  "contracts_checksum": "9dfb1704a24a84cba68a7dc44963f07e1f8ad401abee7ae9203429adfaebe8d5",
+  "tool_versions": {
+    "openapiGenerator": "7.6.0",
+    "redoclyCli": "1.16.0",
+    "datamodelCodegen": "0.25.0",
+    "quicktype": "latest"
+  },
+  "commands_executed": [
+    "npx @redocly/cli@1.16.0 bundle contracts/v1.0.0/api/bff.openapi.yaml --dereferenced",
+    "npx @openapitools/openapi-generator-cli@2.13.4 generate -g typescript-fetch --generator-version=7.6.0",
+    "datamodel-codegen --input contracts/v1.0.0/entities --output services/shared/models.py",
+    "quicktype contracts/v1.0.0/entities -o frontend/src/types/entities.ts"
+  ],
+  "inputs": [
+    "contracts/v1.0.0/entities/",
+    "contracts/v1.0.0/api/bff.openapi.yaml",
+    "contracts/v1.0.0/workflows/",
+    "contracts/version.lock"
+  ],
+  "outputs": [
+    "packages/sdk-bff/",
+    "packages/sdk-bff/.contracts_checksum",
+    "packages/sdk-bff/.codegen_versions.json",
+    "services/shared/models.py",
+    "frontend/src/types/entities.ts"
+  ],
+  "hardening_features": [
+    "deterministic_tool_versions",
+    "provenance_stamping", 
+    "contracts_checksum_verification",
+    "stale_file_removal",
+    "no_deep_import_escape_hatches"
+  ]
+}

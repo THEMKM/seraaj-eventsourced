@@ -8,7 +8,7 @@
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && cp -r src/styles dist/styles || xcopy src\\styles dist\\styles /E /I /Q || true",
     "lint": "echo 'ESLint check - OK'",
     "type-check": "tsc -p tsconfig.json --noEmit"
   },

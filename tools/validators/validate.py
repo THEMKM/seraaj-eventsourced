@@ -2,6 +2,7 @@
 import json
 import hashlib
 import sys
+import re
 from pathlib import Path
 from typing import Dict, List, Set
 import ast
@@ -64,30 +65,150 @@ class DriftValidator:
         """Ensure generated code matches contracts"""
         required_generated = [
             Path("services/shared/models.py"),
-            Path("frontend/src/types/entities.ts")
+            Path("frontend/src/types/entities.ts"),
+            Path("packages/sdk-bff/src/types.ts"),
+            Path("packages/sdk-bff/src/apis.ts")
         ]
         for path in required_generated:
             if not path.exists():
                 self.errors.append(f"Missing generated file: {path}")
                 
-    def validate_event_store(self):
-        """Ensure event store is append-only"""
-        # This would check that event store implementation is append-only
-        pass
+    def validate_sdk_contracts_sync(self):
+        """Validate SDK is in sync with contracts"""
+        contracts_lock = Path("contracts/version.lock")
+        sdk_checksum = Path("packages/sdk-bff/.contracts_checksum")
+        
+        if not contracts_lock.exists():
+            self.warnings.append("No contracts version lock found")
+            return
+            
+        if not sdk_checksum.exists():
+            self.errors.append("Missing SDK contracts checksum file")
+            return
+            
+        with open(contracts_lock) as f:
+            lock_data = json.load(f)
+        expected_checksum = lock_data.get("checksum", "")
+        
+        actual_checksum = sdk_checksum.read_text().strip()
+        
+        if expected_checksum != actual_checksum:
+            self.errors.append(
+                f"SDK out of sync with contracts! "
+                f"Expected: {expected_checksum[:8]}..., Got: {actual_checksum[:8]}..."
+            )
+        else:
+            self.warnings.append("[OK] SDK in sync with contracts")
+                
+    def validate_frontend_compliance(self):
+        """Scan frontend for forbidden patterns"""
+        apps_web_dir = Path("apps/web")
+        if not apps_web_dir.exists():
+            self.warnings.append("No apps/web directory found")
+            return
+            
+        # Forbidden HTTP patterns
+        forbidden_http = [
+            r'\bfetch\s*\(',
+            r'\baxios\.',
+            r'\bky\.',
+            r'\bsuperagent\.',
+            r'from ["\']axios["\']',
+            r'from ["\']ky["\']',
+            r'import.*axios',
+            r'import.*ky'
+        ]
+        
+        # Forbidden deep SDK imports
+        forbidden_sdk_imports = [
+            r'from ["\']@seraaj/sdk-bff/src/',
+            r'import.*@seraaj/sdk-bff/src/'
+        ]
+        
+        violations = []
+        
+        for ts_file in apps_web_dir.rglob("*.ts"):
+            if "node_modules" in str(ts_file):
+                continue
+                
+            try:
+                content = ts_file.read_text()
+                lines = content.split('\n')
+                
+                for line_num, line in enumerate(lines, 1):
+                    # Check forbidden HTTP
+                    for pattern in forbidden_http:
+                        if re.search(pattern, line):
+                            violations.append(f"{ts_file}:{line_num}: Forbidden HTTP usage: {line.strip()}")
+                            
+                    # Check forbidden SDK imports
+                    for pattern in forbidden_sdk_imports:
+                        if re.search(pattern, line):
+                            violations.append(f"{ts_file}:{line_num}: Forbidden deep SDK import: {line.strip()}")
+                            
+            except Exception as e:
+                self.warnings.append(f"Could not scan {ts_file}: {e}")
+                
+        for tsx_file in apps_web_dir.rglob("*.tsx"):
+            if "node_modules" in str(tsx_file):
+                continue
+                
+            try:
+                content = tsx_file.read_text()
+                lines = content.split('\n')
+                
+                for line_num, line in enumerate(lines, 1):
+                    # Check forbidden HTTP
+                    for pattern in forbidden_http:
+                        if re.search(pattern, line):
+                            violations.append(f"{tsx_file}:{line_num}: Forbidden HTTP usage: {line.strip()}")
+                            
+                    # Check forbidden SDK imports
+                    for pattern in forbidden_sdk_imports:
+                        if re.search(pattern, line):
+                            violations.append(f"{tsx_file}:{line_num}: Forbidden deep SDK import: {line.strip()}")
+                            
+            except Exception as e:
+                self.warnings.append(f"Could not scan {tsx_file}: {e}")
+        
+        if violations:
+            self.errors.extend(violations)
+        else:
+            self.warnings.append("[OK] Frontend compliance validated")
         
     def validate_checkpoints(self):
-        """Validate agent checkpoint files"""
+        """Validate agent checkpoint files and their boundaries compliance"""
         checkpoints_dir = Path(".agents/checkpoints")
         boundaries_file = Path(".agents/boundaries.json")
         
-        if boundaries_file.exists():
-            with open(boundaries_file) as f:
-                boundaries = json.load(f)
+        if not boundaries_file.exists():
+            self.errors.append("Missing .agents/boundaries.json file")
+            return
+            
+        with open(boundaries_file) as f:
+            boundaries = json.load(f)
+            
+        for agent, config in boundaries.get("agents", {}).items():
+            checkpoint_file = checkpoints_dir / config.get("checkpoint_file", "")
+            if checkpoint_file.name and checkpoint_file.exists():
+                self.warnings.append(f"[OK] {agent} checkpoint found")
                 
-            for agent, config in boundaries.get("agents", {}).items():
-                checkpoint_file = checkpoints_dir / config.get("checkpoint_file", "")
-                if checkpoint_file.name and checkpoint_file.exists():
-                    self.warnings.append(f"OK {agent} checkpoint found")
+                # Validate that checkpoint outputs are within allowed paths
+                try:
+                    checkpoint_data = json.loads(checkpoint_file.read_text())
+                    paths_touched = checkpoint_data.get("outputs", {}).get("pathsTouched", [])
+                    allowed_paths = config.get("allowed_paths", [])
+                    
+                    for path in paths_touched:
+                        if not self._path_matches_patterns(path, allowed_paths):
+                            self.errors.append(
+                                f"Agent {agent} touched disallowed path: {path}"
+                            )
+                            
+                except (json.JSONDecodeError, KeyError):
+                    self.warnings.append(f"Could not validate paths for {agent} checkpoint")
+            else:
+                self.warnings.append(f"Missing checkpoint for {agent}")
                     
     def _hash_directory(self, directory: Path) -> str:
         """Calculate hash of all files in directory"""
@@ -97,28 +218,37 @@ class DriftValidator:
                 hasher.update(file_path.read_bytes())
         return hasher.hexdigest()
         
+    def _path_matches_patterns(self, path: str, patterns: List[str]) -> bool:
+        """Check if a path matches any of the given glob patterns"""
+        import fnmatch
+        for pattern in patterns:
+            if fnmatch.fnmatch(path, pattern) or fnmatch.fnmatch(path, pattern.rstrip('*')):
+                return True
+        return False
+    
     def run(self) -> bool:
         """Run all validations"""
-        print("Running drift validation...")
+        print("[SERAAJ] Running comprehensive drift validation...")
         
         self.validate_contracts_frozen()
         self.validate_service_boundaries()
         self.validate_generated_code()
-        self.validate_event_store()
+        self.validate_sdk_contracts_sync()
+        self.validate_frontend_compliance()
         self.validate_checkpoints()
         
         if self.errors:
-            print("FAILED: Validation failed with errors:")
+            print("\n[ERROR] VALIDATION FAILED with errors:")
             for error in self.errors:
                 print(f"  - {error}")
             return False
             
         if self.warnings:
-            print("WARNING: Validation notes:")
+            print("\n[WARNING] Validation notes:")
             for warning in self.warnings:
-                print(f"  - {warning}")
+                print(f"  {warning}")
                 
-        print("SUCCESS: Validation passed!")
+        print("\n[SUCCESS] All validations passed!")
         return True
 
 if __name__ == "__main__":
