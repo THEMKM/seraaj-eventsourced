@@ -40,7 +40,8 @@
       "Bash(timeout 5 curl -s http://localhost:8001/health)",
       "Bash(timeout 5 curl -s http://localhost:8003/health)",
       "Bash(pytest:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(git push:*)"
     ],
     "deny": []
   }
