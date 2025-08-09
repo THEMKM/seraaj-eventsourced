@@ -1,0 +1,17 @@
+{
+  "service": "matching",
+  "version": "1.0.0",
+  "contracts_version": "1.0.0",
+  "owns": {
+    "aggregates": ["MatchSuggestion"],
+    "tables": ["match_suggestions", "match_history"],
+    "events_published": ["match-generated", "match-clicked"],
+    "events_consumed": ["volunteer-updated", "opportunity-created"],
+    "commands": ["generate-matches", "quick-match"]
+  },
+  "api_endpoints": [
+    "POST /api/matching/quick-match",
+    "POST /api/matching/generate",
+    "GET /api/matching/suggestions/{volunteerId}"
+  ]
+}

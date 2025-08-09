@@ -35,7 +35,12 @@
       "Bash(bash:*)",
       "Bash(timeout 10 curl -s http://localhost:8000/api/health)",
       "Bash(taskkill:*)",
-      "Bash(copy main_simple.py main.py)"
+      "Bash(copy main_simple.py main.py)",
+      "Bash(pip install:*)",
+      "Bash(timeout 5 curl -s http://localhost:8001/health)",
+      "Bash(timeout 5 curl -s http://localhost:8003/health)",
+      "Bash(pytest:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }

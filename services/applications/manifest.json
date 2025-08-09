@@ -1,0 +1,34 @@
+{
+  "service": "applications",
+  "version": "1.0.0",
+  "contracts_version": "1.0.0",
+  "owns": {
+    "aggregates": ["Application"],
+    "tables": ["applications", "application_events"],
+    "events_published": [
+      "application.submitted",
+      "application.state.changed",
+      "application.completed"
+    ],
+    "events_consumed": [
+      "volunteer.verified",
+      "opportunity.published",
+      "opportunity.closed"
+    ],
+    "commands": [
+      "submit-application",
+      "review-application",
+      "accept-application",
+      "reject-application",
+      "complete-application",
+      "cancel-application"
+    ]
+  },
+  "api_endpoints": [
+    "POST /api/applications",
+    "GET /api/applications/{id}",
+    "PATCH /api/applications/{id}/state",
+    "GET /api/applications/volunteer/{volunteerId}",
+    "GET /api/applications/opportunity/{opportunityId}"
+  ]
+}

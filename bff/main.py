@@ -15,6 +15,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import uvicorn
 
+# Import service adapters
+from .adapters.applications import ApplicationsAdapter
+from .adapters.matching import MatchingAdapter
+
 
 # Load OpenAPI schema for validation
 def load_openapi_schema():
@@ -229,22 +233,59 @@ async def health_check():
     return response_data
 
 
-# Volunteer endpoints (stubbed with contract-accurate mock data)
+@app.get("/api/health/services")
+async def services_health_check():
+    """Extended health check that includes dependent services"""
+    applications_healthy = await applications_adapter.health_check()
+    matching_healthy = await matching_adapter.health_check()
+    
+    overall_status = "healthy" if applications_healthy and matching_healthy else "degraded"
+    
+    response_data = {
+        "status": overall_status,
+        "timestamp": datetime.utcnow().isoformat(),
+        "version": "1.0.0",
+        "services": {
+            "applications": "healthy" if applications_healthy else "unhealthy",
+            "matching": "healthy" if matching_healthy else "unhealthy"
+        }
+    }
+    
+    return response_data
+
+
+# Initialize service adapters
+applications_adapter = ApplicationsAdapter()
+matching_adapter = MatchingAdapter()
+
+
+# Volunteer endpoints with real service calls
 @app.post("/api/volunteer/quick-match")
 async def get_quick_match(request: QuickMatchRequest):
     """Get quick match suggestions for a volunteer"""
     print(f"[DEBUG] Quick match request for volunteer: {request.volunteerId}, limit: {request.limit}")
     
-    # Generate mock matches that conform to schema
-    matches = [
-        generate_mock_match_suggestion(request.volunteerId, i)
-        for i in range(min(request.limit, 3))  # Return up to 3 mock matches
-    ]
-    
-    # Validate response against schema
-    validate_response_schema("/volunteer/quick-match", "post", 200, matches)
-    
-    return matches
+    try:
+        # Call matching service
+        matches = await matching_adapter.quick_match(request.volunteerId, request.limit)
+        
+        # Validate response against schema
+        validate_response_schema("/volunteer/quick-match", "post", 200, matches)
+        
+        return matches
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions (from service adapter)
+        raise
+    except Exception as e:
+        print(f"[ERROR] Quick match failed: {str(e)}")
+        # Fallback to mock data for graceful degradation
+        matches = [
+            generate_mock_match_suggestion(request.volunteerId, i)
+            for i in range(min(request.limit, 3))
+        ]
+        validate_response_schema("/volunteer/quick-match", "post", 200, matches)
+        return matches
 
 
 @app.post("/api/volunteer/apply", status_code=201)
@@ -252,17 +293,25 @@ async def submit_application(request: SubmitApplicationRequest):
     """Submit a volunteer application"""
     print(f"[DEBUG] Application submission for volunteer: {request.volunteerId}, opportunity: {request.opportunityId}")
     
-    # Generate mock application response
-    application = generate_mock_application(request.volunteerId)
-    application.update({
-        "opportunityId": request.opportunityId,
-        "coverLetter": request.coverLetter
-    })
-    
-    # Validate response against schema
-    validate_response_schema("/volunteer/apply", "post", 201, application)
-    
-    return application
+    try:
+        # Call applications service
+        application = await applications_adapter.submit_application(
+            request.volunteerId, 
+            request.opportunityId, 
+            request.coverLetter
+        )
+        
+        # Validate response against schema
+        validate_response_schema("/volunteer/apply", "post", 201, application)
+        
+        return application
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions (from service adapter)
+        raise
+    except Exception as e:
+        print(f"[ERROR] Application submission failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 @app.get("/api/volunteer/{volunteer_id}/dashboard")
@@ -270,23 +319,63 @@ async def get_volunteer_dashboard(volunteer_id: str):
     """Get volunteer dashboard data"""
     print(f"[DEBUG] Dashboard request for volunteer: {volunteer_id}")
     
-    # Generate mock dashboard data
-    dashboard_data = {
-        "profile": generate_mock_volunteer_profile(volunteer_id),
-        "activeApplications": [
-            generate_mock_application(volunteer_id, i)
-            for i in range(2)  # 2 active applications
-        ],
-        "recentMatches": [
-            generate_mock_match_suggestion(volunteer_id, i)
-            for i in range(3)  # 3 recent matches
+    try:
+        # Fetch data from multiple services concurrently
+        # In production, these would be done in parallel
+        
+        # Get applications from applications service
+        applications = await applications_adapter.get_volunteer_applications(volunteer_id)
+        
+        # Filter for active applications (not in final states)
+        active_applications = [
+            app for app in applications 
+            if app.get('status') not in ['completed', 'cancelled', 'rejected']
         ]
-    }
-    
-    # Validate response against schema
-    validate_response_schema("/volunteer/{volunteerId}/dashboard", "get", 200, dashboard_data)
-    
-    return dashboard_data
+        
+        # Get recent matches from matching service
+        recent_matches = await matching_adapter.get_suggestions(volunteer_id)
+        
+        # Generate profile data (mock for now - would come from volunteer service in production)
+        profile = generate_mock_volunteer_profile(volunteer_id)
+        
+        # Update profile stats based on real data
+        profile.update({
+            "completedApplications": len([
+                app for app in applications 
+                if app.get('status') == 'completed'
+            ])
+        })
+        
+        dashboard_data = {
+            "profile": profile,
+            "activeApplications": active_applications,
+            "recentMatches": recent_matches
+        }
+        
+        # Validate response against schema
+        validate_response_schema("/volunteer/{volunteerId}/dashboard", "get", 200, dashboard_data)
+        
+        return dashboard_data
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        print(f"[ERROR] Dashboard request failed: {str(e)}")
+        # Fallback to mock data for graceful degradation
+        dashboard_data = {
+            "profile": generate_mock_volunteer_profile(volunteer_id),
+            "activeApplications": [
+                generate_mock_application(volunteer_id, i)
+                for i in range(2)
+            ],
+            "recentMatches": [
+                generate_mock_match_suggestion(volunteer_id, i)
+                for i in range(3)
+            ]
+        }
+        validate_response_schema("/volunteer/{volunteerId}/dashboard", "get", 200, dashboard_data)
+        return dashboard_data
 
 
 if __name__ == "__main__":

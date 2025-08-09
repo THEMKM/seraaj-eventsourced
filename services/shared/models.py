@@ -9,9 +9,13 @@ class Application(BaseModel):
     id: str
     volunteerId: str
     opportunityId: str
+    organizationId: Optional[str] = None
     status: str
-    createdAt: datetime
     coverLetter: Optional[str] = None
+    submittedAt: Optional[datetime] = None
+    reviewedAt: Optional[datetime] = None
+    createdAt: datetime
+    updatedAt: Optional[datetime] = None
 
 class MatchSuggestion(BaseModel):
     id: str
@@ -19,6 +23,8 @@ class MatchSuggestion(BaseModel):
     opportunityId: str
     organizationId: str
     score: float
+    scoreComponents: Optional[dict] = None
+    explanation: Optional[List[str]] = None
     generatedAt: datetime
     status: str
 
