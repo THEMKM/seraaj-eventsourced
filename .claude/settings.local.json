@@ -13,7 +13,20 @@
       "Bash(cat:*)",
       "Bash(npx tsc:*)",
       "Bash(tsc:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm list:*)",
+      "Bash(pnpm --filter @seraaj/ui install)",
+      "Bash(cp:*)",
+      "Bash(pnpm dev:web:*)",
+      "Bash(curl:*)",
+      "Bash(pkill:*)",
+      "Bash(pnpm -w type-check)",
+      "Bash(pnpm -w lint)",
+      "Bash(rm:*)",
+      "Bash(pnpm -w build)",
+      "Bash(pnpm build:*)",
+      "Bash(git rev-parse:*)"
     ],
     "deny": []
   }

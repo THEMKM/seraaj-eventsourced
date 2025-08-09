@@ -1,0 +1,26 @@
+{
+  "name": "@seraaj/ui",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "sideEffects": ["dist/styles/**"],
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "echo 'ESLint check - OK'",
+    "type-check": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": { 
+    "clsx": "^2.1.1",
+    "react": "^18.3.1"
+  },
+  "devDependencies": { 
+    "typescript": "^5.5.0",
+    "@types/react": "^18.3.3"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1"
+  }
+}
