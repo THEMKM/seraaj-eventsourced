@@ -1,6 +1,6 @@
 # Seraaj Claude Code Sub-Agents
 
-This directory contains 6 specialized sub-agents for building the Seraaj event-sourced volunteer management platform. Each agent has strict boundaries and specific responsibilities.
+This directory contains 7 specialized sub-agents for building the Seraaj event-sourced volunteer management platform. Each agent has strict boundaries and specific responsibilities.
 
 ## Agent Execution Sequence
 
@@ -36,8 +36,16 @@ This directory contains 6 specialized sub-agents for building the Seraaj event-s
 - Event bus setup
 - Docker configuration
 
-### Phase 5: Validation (1 hour)
-**6. validator** - Validate entire system integrity
+### Phase 5: Frontend Development (2 hours)
+**6. frontend-composer** - Create Next.js 14 frontend with 8-Bit Optimism design system
+- Complete Next.js app with App Router
+- 8-Bit Optimism design system (@seraaj/ui)
+- Monorepo structure with pnpm workspaces
+- BFF SDK integration with HTTP boundaries
+- ESLint enforcement preventing direct API calls
+
+### Phase 6: Validation (1 hour)  
+**7. validator** - Validate entire system integrity
 - Contract compliance verification
 - Service boundary enforcement
 - Event sourcing integrity
@@ -50,6 +58,7 @@ This directory contains 6 specialized sub-agents for building the Seraaj event-s
 > Use the contract-architect subagent to define all contracts
 > Use the generator subagent to generate code from contracts  
 > Use the service-builder-applications subagent to implement the applications service
+> Use the frontend-composer subagent to create the Next.js frontend
 ```
 
 ### Sequential Execution
@@ -66,6 +75,9 @@ This directory contains 6 specialized sub-agents for building the Seraaj event-s
 
 # Then orchestrate
 > Use the orchestrator subagent
+
+# Then build frontend
+> Use the frontend-composer subagent
 
 # Finally validate
 > Use the validator subagent

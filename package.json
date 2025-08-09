@@ -1,15 +1,20 @@
 {
   "name": "seraaj",
   "version": "1.0.0",
+  "workspaces": ["apps/*", "packages/*"],
   "scripts": {
     "validate:schemas": "ajv compile -s 'contracts/**/*.json' --strict=true",
     "generate": "make generate",
     "test:contracts": "jest tests/contracts",
-    "checkpoint": "make checkpoint"
+    "checkpoint": "make checkpoint",
+    "dev:web": "pnpm --filter @seraaj/web dev",
+    "build:web": "pnpm --filter @seraaj/web build"
   },
   "devDependencies": {
     "ajv-cli": "^5.0.0",
     "@openapitools/openapi-generator-cli": "^2.7.0",
-    "quicktype": "^23.0.0"
+    "quicktype": "^23.0.0",
+    "@redocly/cli": "^1.0.0",
+    "typescript": "^5.0.0"
   }
 }

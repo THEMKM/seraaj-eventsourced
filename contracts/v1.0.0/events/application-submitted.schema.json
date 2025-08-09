@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://seraaj.org/schemas/v1.0.0/events/application-submitted",
+  "title": "ApplicationSubmittedEvent",
+  "description": "Event fired when a volunteer submits an application",
+  "type": "object",
+  "required": ["eventId", "eventType", "aggregateId", "timestamp", "data"],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique event identifier"
+    },
+    "eventType": {
+      "type": "string",
+      "const": "application.submitted",
+      "description": "Event type identifier"
+    },
+    "aggregateId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Application ID (the aggregate root)"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the event occurred"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Event version for the aggregate"
+    },
+    "data": {
+      "type": "object",
+      "required": ["volunteerId", "opportunityId"],
+      "properties": {
+        "volunteerId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ID of the volunteer who submitted"
+        },
+        "opportunityId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ID of the opportunity applied to"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "ID of the organization offering the opportunity"
+        },
+        "coverLetter": {
+          "type": "string",
+          "description": "Optional cover letter"
+        },
+        "submittedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Submission timestamp"
+        }
+      }
+    }
+  }
+}

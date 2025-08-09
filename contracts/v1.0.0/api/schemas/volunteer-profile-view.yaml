@@ -1,0 +1,95 @@
+type: object
+title: VolunteerProfileView
+description: A volunteer's profile view for dashboard display
+required:
+  - id
+  - email
+  - firstName
+  - lastName
+  - level
+  - createdAt
+properties:
+  id:
+    type: string
+    format: uuid
+    description: Unique volunteer identifier
+  email:
+    type: string
+    format: email
+    description: Volunteer's email address
+  firstName:
+    type: string
+    minLength: 1
+    maxLength: 100
+    description: Volunteer's first name
+  lastName:
+    type: string
+    minLength: 1
+    maxLength: 100
+    description: Volunteer's last name
+  level:
+    type: integer
+    minimum: 1
+    maximum: 100
+    default: 1
+    description: Gamification level
+  status:
+    type: string
+    enum:
+      - pending
+      - active
+      - inactive
+      - suspended
+    description: Account status
+  skills:
+    type: array
+    items:
+      type: string
+      enum:
+        - teaching
+        - medical
+        - technical
+        - administrative
+        - creative
+        - physical
+        - social
+    description: Volunteer's verified skills
+  badges:
+    type: array
+    items:
+      type: object
+      required:
+        - id
+        - name
+        - earnedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        imageUrl:
+          type: string
+          format: uri
+        earnedAt:
+          type: string
+          format: date-time
+    description: Earned badges
+  totalHours:
+    type: number
+    minimum: 0
+    description: Total volunteer hours completed
+  completedApplications:
+    type: integer
+    minimum: 0
+    description: Number of completed volunteer applications
+  createdAt:
+    type: string
+    format: date-time
+    description: When the volunteer profile was created
+  lastActive:
+    type: string
+    format: date-time
+    description: Last activity timestamp

@@ -1,0 +1,57 @@
+type: object
+title: Application
+description: A volunteer application to an opportunity
+required:
+  - id
+  - volunteerId
+  - opportunityId
+  - status
+  - createdAt
+properties:
+  id:
+    type: string
+    format: uuid
+    description: Unique application identifier
+  volunteerId:
+    type: string
+    format: uuid
+    description: ID of the applying volunteer
+  opportunityId:
+    type: string
+    format: uuid
+    description: ID of the opportunity being applied to
+  organizationId:
+    type: string
+    format: uuid
+    description: ID of the organization offering the opportunity
+  status:
+    type: string
+    enum:
+      - draft
+      - submitted
+      - reviewing
+      - accepted
+      - rejected
+      - completed
+      - cancelled
+    description: Current status of the application
+  coverLetter:
+    type: string
+    maxLength: 1000
+    description: Optional cover letter from volunteer
+  submittedAt:
+    type: string
+    format: date-time
+    description: When application was submitted
+  reviewedAt:
+    type: string
+    format: date-time
+    description: When application was reviewed
+  createdAt:
+    type: string
+    format: date-time
+    description: When application was created
+  updatedAt:
+    type: string
+    format: date-time
+    description: When application was last updated

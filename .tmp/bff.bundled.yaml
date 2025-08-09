@@ -1,0 +1,514 @@
+openapi: 3.0.3
+info:
+  title: Seraaj BFF API
+  description: Backend for Frontend API for the Seraaj volunteer platform
+  version: 1.0.0
+  contact:
+    name: Seraaj Team
+    url: https://seraaj.org
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+servers:
+  - url: http://localhost:8000/api
+    description: Development server
+security:
+  - BearerAuth: []
+tags:
+  - name: System
+    description: System health and status endpoints
+  - name: Volunteer
+    description: Volunteer-related operations
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Health check endpoint
+      tags:
+        - System
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                properties:
+                  status:
+                    type: string
+                    enum:
+                      - healthy
+                  timestamp:
+                    type: string
+                    format: date-time
+                  version:
+                    type: string
+        '503':
+          description: Service unavailable
+          content:
+            application/json:
+              schema:
+                type: object
+                required: &ref_0
+                  - error
+                  - message
+                properties: &ref_1
+                  error:
+                    type: string
+                    description: Error code or type
+                  message:
+                    type: string
+                    description: Human-readable error message
+                  details:
+                    type: object
+                    description: Additional error details
+                  timestamp:
+                    type: string
+                    format: date-time
+                    description: When the error occurred
+                  requestId:
+                    type: string
+                    description: Unique request identifier for tracking
+  /volunteer/quick-match:
+    post:
+      operationId: getQuickMatch
+      summary: Get quick match suggestions for a volunteer
+      tags:
+        - Volunteer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - volunteerId
+              properties:
+                volunteerId:
+                  type: string
+                  format: uuid
+                  description: ID of the volunteer requesting matches
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 50
+                  default: 10
+                  description: Maximum number of matches to return
+      responses:
+        '200':
+          description: Match suggestions returned successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  title: MatchSuggestion
+                  description: A suggested match between volunteer and opportunity
+                  required: &ref_4
+                    - id
+                    - volunteerId
+                    - opportunityId
+                    - organizationId
+                    - score
+                    - generatedAt
+                    - status
+                  properties: &ref_5
+                    id:
+                      type: string
+                      format: uuid
+                      description: Unique match suggestion identifier
+                    volunteerId:
+                      type: string
+                      format: uuid
+                      description: ID of the matched volunteer
+                    opportunityId:
+                      type: string
+                      format: uuid
+                      description: ID of the matched opportunity
+                    organizationId:
+                      type: string
+                      format: uuid
+                      description: ID of the organization offering the opportunity
+                    score:
+                      type: number
+                      minimum: 0
+                      maximum: 100
+                      description: Match confidence score (0-100)
+                    reasons:
+                      type: array
+                      items:
+                        type: string
+                      description: List of reasons why this is a good match
+                    opportunityTitle:
+                      type: string
+                      description: Title of the matched opportunity
+                    organizationName:
+                      type: string
+                      description: Name of the organization
+                    status:
+                      type: string
+                      enum:
+                        - active
+                        - applied
+                        - expired
+                        - dismissed
+                      description: Current status of the match suggestion
+                    generatedAt:
+                      type: string
+                      format: date-time
+                      description: When the match was generated
+                    expiresAt:
+                      type: string
+                      format: date-time
+                      description: When the match suggestion expires
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                type: object
+                required: *ref_0
+                properties: *ref_1
+        '404':
+          description: Volunteer not found
+          content:
+            application/json:
+              schema:
+                type: object
+                required: *ref_0
+                properties: *ref_1
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                required: *ref_0
+                properties: *ref_1
+  /volunteer/apply:
+    post:
+      operationId: submitApplication
+      summary: Submit a volunteer application
+      tags:
+        - Volunteer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              title: SubmitApplicationCommand
+              description: Command to submit a volunteer application
+              required: &ref_6
+                - volunteerId
+                - opportunityId
+              properties: &ref_7
+                volunteerId:
+                  type: string
+                  format: uuid
+                  description: ID of the volunteer submitting the application
+                opportunityId:
+                  type: string
+                  format: uuid
+                  description: ID of the opportunity being applied to
+                coverLetter:
+                  type: string
+                  maxLength: 1000
+                  description: Optional cover letter from volunteer
+      responses:
+        '201':
+          description: Application submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                title: Application
+                description: A volunteer application to an opportunity
+                required: &ref_2
+                  - id
+                  - volunteerId
+                  - opportunityId
+                  - status
+                  - createdAt
+                properties: &ref_3
+                  id:
+                    type: string
+                    format: uuid
+                    description: Unique application identifier
+                  volunteerId:
+                    type: string
+                    format: uuid
+                    description: ID of the applying volunteer
+                  opportunityId:
+                    type: string
+                    format: uuid
+                    description: ID of the opportunity being applied to
+                  organizationId:
+                    type: string
+                    format: uuid
+                    description: ID of the organization offering the opportunity
+                  status:
+                    type: string
+                    enum:
+                      - draft
+                      - submitted
+                      - reviewing
+                      - accepted
+                      - rejected
+                      - completed
+                      - cancelled
+                    description: Current status of the application
+                  coverLetter:
+                    type: string
+                    maxLength: 1000
+                    description: Optional cover letter from volunteer
+                  submittedAt:
+                    type: string
+                    format: date-time
+                    description: When application was submitted
+                  reviewedAt:
+                    type: string
+                    format: date-time
+                    description: When application was reviewed
+                  createdAt:
+                    type: string
+                    format: date-time
+                    description: When application was created
+                  updatedAt:
+                    type: string
+                    format: date-time
+                    description: When application was last updated
+        '400':
+          description: Invalid application data
+          content:
+            application/json:
+              schema:
+                type: object
+                required: *ref_0
+                properties: *ref_1
+        '404':
+          description: Volunteer or opportunity not found
+          content:
+            application/json:
+              schema:
+                type: object
+                required: *ref_0
+                properties: *ref_1
+        '409':
+          description: Application already exists or opportunity is full
+          content:
+            application/json:
+              schema:
+                type: object
+                required: *ref_0
+                properties: *ref_1
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                required: *ref_0
+                properties: *ref_1
+  /volunteer/{volunteerId}/dashboard:
+    get:
+      operationId: getVolunteerDashboard
+      summary: Get volunteer dashboard data
+      tags:
+        - Volunteer
+      parameters:
+        - name: volunteerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the volunteer
+      responses:
+        '200':
+          description: Dashboard data returned successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - profile
+                  - activeApplications
+                  - recentMatches
+                properties:
+                  profile:
+                    type: object
+                    title: VolunteerProfileView
+                    description: A volunteer's profile view for dashboard display
+                    required: &ref_8
+                      - id
+                      - email
+                      - firstName
+                      - lastName
+                      - level
+                      - createdAt
+                    properties: &ref_9
+                      id:
+                        type: string
+                        format: uuid
+                        description: Unique volunteer identifier
+                      email:
+                        type: string
+                        format: email
+                        description: Volunteer's email address
+                      firstName:
+                        type: string
+                        minLength: 1
+                        maxLength: 100
+                        description: Volunteer's first name
+                      lastName:
+                        type: string
+                        minLength: 1
+                        maxLength: 100
+                        description: Volunteer's last name
+                      level:
+                        type: integer
+                        minimum: 1
+                        maximum: 100
+                        default: 1
+                        description: Gamification level
+                      status:
+                        type: string
+                        enum:
+                          - pending
+                          - active
+                          - inactive
+                          - suspended
+                        description: Account status
+                      skills:
+                        type: array
+                        items:
+                          type: string
+                          enum:
+                            - teaching
+                            - medical
+                            - technical
+                            - administrative
+                            - creative
+                            - physical
+                            - social
+                        description: Volunteer's verified skills
+                      badges:
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - id
+                            - name
+                            - earnedAt
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            name:
+                              type: string
+                            description:
+                              type: string
+                            imageUrl:
+                              type: string
+                              format: uri
+                            earnedAt:
+                              type: string
+                              format: date-time
+                        description: Earned badges
+                      totalHours:
+                        type: number
+                        minimum: 0
+                        description: Total volunteer hours completed
+                      completedApplications:
+                        type: integer
+                        minimum: 0
+                        description: Number of completed volunteer applications
+                      createdAt:
+                        type: string
+                        format: date-time
+                        description: When the volunteer profile was created
+                      lastActive:
+                        type: string
+                        format: date-time
+                        description: Last activity timestamp
+                  activeApplications:
+                    type: array
+                    items:
+                      type: object
+                      title: Application
+                      description: A volunteer application to an opportunity
+                      required: *ref_2
+                      properties: *ref_3
+                    description: Applications that are not in final state
+                  recentMatches:
+                    type: array
+                    items:
+                      type: object
+                      title: MatchSuggestion
+                      description: A suggested match between volunteer and opportunity
+                      required: *ref_4
+                      properties: *ref_5
+                    description: Recent match suggestions for the volunteer
+        '400':
+          description: Invalid volunteer ID
+          content:
+            application/json:
+              schema:
+                type: object
+                required: *ref_0
+                properties: *ref_1
+        '404':
+          description: Volunteer not found
+          content:
+            application/json:
+              schema:
+                type: object
+                required: *ref_0
+                properties: *ref_1
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                required: *ref_0
+                properties: *ref_1
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      required: *ref_0
+      properties: *ref_1
+    match-suggestion:
+      type: object
+      title: MatchSuggestion
+      description: A suggested match between volunteer and opportunity
+      required: *ref_4
+      properties: *ref_5
+    submit-application:
+      type: object
+      title: SubmitApplicationCommand
+      description: Command to submit a volunteer application
+      required: *ref_6
+      properties: *ref_7
+    application:
+      type: object
+      title: Application
+      description: A volunteer application to an opportunity
+      required: *ref_2
+      properties: *ref_3
+    volunteer-profile-view:
+      type: object
+      title: VolunteerProfileView
+      description: A volunteer's profile view for dashboard display
+      required: *ref_8
+      properties: *ref_9
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

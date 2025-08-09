@@ -5,7 +5,7 @@
       "checkpoint_file": "contracts.done"
     },
     "GENERATOR": {
-      "allowed_paths": ["tools/generators/**", "services/shared/**", "frontend/src/types/**"],
+      "allowed_paths": ["tools/generators/**", "services/shared/**", "frontend/src/types/**", "packages/sdk-bff/**"],
       "checkpoint_file": "generation.done"
     },
     "SERVICE_BUILDER_APPLICATIONS": {
@@ -27,6 +27,19 @@
     "VALIDATOR": {
       "allowed_paths": ["tests/**", "tools/validators/**"],
       "checkpoint_file": "validation.done"
+    },
+    "FRONTEND_COMPOSER": {
+      "allowed_paths": [
+        "apps/web/**",
+        "packages/ui/**", 
+        "packages/config/**",
+        "packages/sdk-bff/**",
+        "package.json",
+        "pnpm-workspace.yaml",
+        ".npmrc",
+        ".gitignore"
+      ],
+      "checkpoint_file": "frontend.done"
     }
   }
 }

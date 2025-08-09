@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://seraaj.org/schemas/v1.0.0/entities/match-suggestion",
+  "title": "MatchSuggestion",
+  "description": "A suggested match between volunteer and opportunity",
+  "type": "object",
+  "required": ["id", "volunteerId", "opportunityId", "organizationId", "score", "generatedAt", "status"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique match suggestion identifier"
+    },
+    "volunteerId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "ID of the matched volunteer"
+    },
+    "opportunityId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "ID of the matched opportunity"
+    },
+    "organizationId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "ID of the organization offering the opportunity"
+    },
+    "score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Match confidence score (0-100)"
+    },
+    "reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of reasons why this is a good match"
+    },
+    "opportunityTitle": {
+      "type": "string",
+      "description": "Title of the matched opportunity"
+    },
+    "organizationName": {
+      "type": "string",
+      "description": "Name of the organization"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "applied", "expired", "dismissed"],
+      "description": "Current status of the match suggestion"
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the match was generated"
+    },
+    "expiresAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the match suggestion expires"
+    }
+  }
+}

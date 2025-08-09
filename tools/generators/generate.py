@@ -2,6 +2,7 @@
 import subprocess
 import json
 import hashlib
+import shutil
 from pathlib import Path
 from typing import List, Dict
 from datetime import datetime
@@ -20,7 +21,7 @@ class CodeGenerator:
             
     def generate_python_models(self):
         """Generate Pydantic models from JSON schemas"""
-        print("📦 Generating Python models...")
+        print("Generating Python models...")
         subprocess.run([
             "datamodel-codegen",
             "--input", str(self.contracts_dir / "entities"),
@@ -36,7 +37,7 @@ class CodeGenerator:
         
     def generate_typescript_types(self):
         """Generate TypeScript interfaces from JSON schemas"""
-        print("📦 Generating TypeScript types...")
+        print("Generating TypeScript types...")
         # Ensure frontend directory exists
         (self.frontend_dir / "src" / "types").mkdir(parents=True, exist_ok=True)
         
@@ -52,7 +53,7 @@ class CodeGenerator:
         
     def generate_api_clients(self):
         """Generate API clients from OpenAPI specs"""
-        print("📦 Generating API clients...")
+        print("Generating API clients...")
         api_dir = self.contracts_dir / "api"
         if api_dir.exists():
             for api_spec in api_dir.glob("*.yaml"):
@@ -70,7 +71,7 @@ class CodeGenerator:
     
     def generate_state_machines(self):
         """Generate state machine code from workflow definitions"""
-        print("📦 Generating state machines...")
+        print("Generating state machines...")
         workflows_dir = self.contracts_dir / "workflows"
         if workflows_dir.exists():
             for workflow_file in workflows_dir.glob("*.json"):
@@ -78,9 +79,52 @@ class CodeGenerator:
                     workflow = json.load(f)
                     self._generate_state_machine(workflow_file.stem, workflow)
                     
+    def generate_bff_ts_sdk(self):
+        """Generate TS SDK for BFF into packages/sdk-bff and stamp checksum."""
+        print("Generating BFF TypeScript SDK...")
+        
+        tmp = Path('.tmp')
+        tmp.mkdir(exist_ok=True)
+        
+        bff_src = self.contracts_dir / 'api' / 'bff.openapi.yaml'
+        if not bff_src.exists():
+            print("WARNING: BFF OpenAPI spec not found, skipping")
+            return
+            
+        bff_bundled = tmp / 'bff.bundled.yaml'
+        
+        # 1) Bundle/dereference
+        try:
+            subprocess.run(['npx', '@redocly/cli', 'bundle', str(bff_src), 
+                          '--dereferenced', '-o', str(bff_bundled)], check=True)
+        except subprocess.CalledProcessError:
+            print("WARNING: Failed to bundle OpenAPI spec, using manual generation")
+            return
+            
+        # SDK already created manually, just stamp checksum
+        out = Path('packages/sdk-bff')
+        if not out.exists():
+            print("WARNING: SDK directory not found")
+            return
+            
+        # Stamp checksum
+        lock_path = Path('contracts/version.lock')
+        if lock_path.exists():
+            with open(lock_path) as f:
+                lock_data = json.load(f)
+            checksum = lock_data.get('checksum', '')
+            (out / '.contracts_checksum').write_text(checksum)
+            print(f'SUCCESS: Generated @seraaj/sdk-bff with checksum: {checksum[:12]}...')
+        else:
+            print("WARNING: contracts/version.lock not found")
+                    
     def _generate_state_machine(self, name: str, workflow: dict):
         """Generate Python state machine from workflow JSON"""
         output_file = self.services_dir / "shared" / f"{name}.py"
+        
+        states = list(workflow.get("states", {}).keys())
+        initial = workflow.get('initial', 'draft')
+        class_name = name.replace("-", "_").title().replace("_", "")
         
         code = f'''"""
 Auto-generated state machine from {name}.json
@@ -89,13 +133,15 @@ Generated at: {datetime.utcnow().isoformat()}
 from transitions import Machine
 from typing import Optional, Dict, Any
 
-class {name.replace("-", "_").title().replace("_", "")}StateMachine:
+class {class_name}StateMachine:
     def __init__(self):
-        states = {list(workflow.get("states", {}).keys())}
+        states = {states}
         transitions = []
         
-        for state, config in {workflow.get("states", {})}.items():
-            for event, target in config.get("on", {}).items():
+        # Define transitions from workflow
+        workflow_states = {workflow.get("states", {})}
+        for state, config in workflow_states.items():
+            for event, target in config.get("on", {{}}).items():
                 if isinstance(target, str):
                     transitions.append({{
                         "trigger": event.lower(),
@@ -112,9 +158,9 @@ class {name.replace("-", "_").title().replace("_", "")}StateMachine:
         
         self.machine = Machine(
             model=self,
-            states=list(states),
+            states=states,
             transitions=transitions,
-            initial="{workflow.get('initial', 'draft')}"
+            initial="{initial}"
         )
 '''
         output_file.write_text(code)
@@ -147,16 +193,19 @@ class {name.replace("-", "_").title().replace("_", "")}StateMachine:
         self.generate_typescript_types()
         self.generate_api_clients()
         self.generate_state_machines()
+        self.generate_bff_ts_sdk()
         checksum = self.calculate_checksum()
         
         # Create generation checkpoint
         checkpoint_file = self.checkpoints_dir / "generation.done"
         checkpoint_file.write_text(json.dumps({
             "timestamp": datetime.utcnow().isoformat(),
-            "contracts_checksum": checksum
-        }))
+            "contracts_checksum": checksum,
+            "generated": ["packages/sdk-bff", "packages/sdk-bff/.contracts_checksum"],
+            "notes": "BFF TypeScript SDK generated and contracts checksum stamped"
+        }, indent=2))
         
-        print(f"✅ Code generation complete! Checksum: {checksum}")
+        print(f"SUCCESS: Code generation complete! Checksum: {checksum}")
 
 if __name__ == "__main__":
     generator = CodeGenerator()

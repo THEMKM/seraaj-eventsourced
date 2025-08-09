@@ -1,0 +1,9 @@
+{
+  "timestamp": "2025-08-09T00:11:30Z",
+  "status": "complete",
+  "api": "bff.openapi.yaml",
+  "entities": 3,
+  "commands": 1,
+  "events": 1,
+  "workflows": 1
+}

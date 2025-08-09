@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://seraaj.org/schemas/v1.0.0/commands/submit-application",
+  "title": "SubmitApplicationCommand",
+  "description": "Command to submit a volunteer application",
+  "type": "object",
+  "required": ["volunteerId", "opportunityId"],
+  "properties": {
+    "volunteerId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "ID of the volunteer submitting the application"
+    },
+    "opportunityId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "ID of the opportunity being applied to"
+    },
+    "coverLetter": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Optional cover letter from volunteer"
+    }
+  }
+}

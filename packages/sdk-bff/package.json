@@ -1,0 +1,20 @@
+{
+  "name": "@seraaj/sdk-bff",
+  "version": "1.0.0",
+  "private": false,
+  "type": "module",
+  "sideEffects": false,
+  "main": "index.ts",
+  "module": "index.ts",
+  "types": "index.ts",
+  "exports": {
+    ".": {
+      "types": "./index.ts",
+      "default": "./index.ts"
+    },
+    "./client": {
+      "types": "./src/client.ts",
+      "default": "./src/client.ts"
+    }
+  }
+}

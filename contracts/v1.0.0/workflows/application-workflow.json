@@ -1,0 +1,101 @@
+{
+  "id": "application-workflow",
+  "name": "Application Workflow",
+  "description": "State machine for volunteer application lifecycle",
+  "version": "1.0.0",
+  "initial": "draft",
+  "states": {
+    "draft": {
+      "description": "Application is being prepared",
+      "on": {
+        "SUBMIT": {
+          "target": "submitted",
+          "guards": ["hasRequiredFields", "volunteerIsActive", "opportunityIsOpen"],
+          "actions": ["notifyOrganization", "createSubmissionRecord"]
+        }
+      }
+    },
+    "submitted": {
+      "description": "Application has been submitted and awaiting review",
+      "on": {
+        "START_REVIEW": {
+          "target": "reviewing",
+          "actions": ["assignReviewer", "notifyReviewer"]
+        },
+        "AUTO_REJECT": {
+          "target": "rejected",
+          "guards": ["opportunityIsFull", "volunteerNotEligible"],
+          "actions": ["notifyVolunteer", "recordRejectionReason"]
+        }
+      }
+    },
+    "reviewing": {
+      "description": "Application is under review by organization",
+      "on": {
+        "ACCEPT": {
+          "target": "accepted",
+          "actions": ["notifyVolunteer", "reserveSpot", "createAcceptanceRecord"]
+        },
+        "REJECT": {
+          "target": "rejected",
+          "actions": ["notifyVolunteer", "recordRejectionReason"]
+        }
+      }
+    },
+    "accepted": {
+      "description": "Application has been accepted",
+      "on": {
+        "COMPLETE": {
+          "target": "completed",
+          "actions": ["awardPoints", "generateCertificate", "releaseSpot", "recordCompletionHours"]
+        },
+        "CANCEL": {
+          "target": "cancelled",
+          "actions": ["releaseSpot", "notifyOrganization", "recordCancellationReason"]
+        }
+      }
+    },
+    "rejected": {
+      "description": "Application has been rejected",
+      "type": "final",
+      "entry": ["recordFinalStatus"]
+    },
+    "completed": {
+      "description": "Application has been completed successfully",
+      "type": "final",
+      "entry": ["recordHours", "checkBadgeEligibility", "updateVolunteerStats"]
+    },
+    "cancelled": {
+      "description": "Application has been cancelled",
+      "type": "final",
+      "entry": ["recordCancellationStats"]
+    }
+  },
+  "guards": {
+    "hasRequiredFields": "Check if all required fields are present",
+    "volunteerIsActive": "Check if volunteer account is in active status",
+    "opportunityIsOpen": "Check if opportunity is still accepting applications",
+    "opportunityIsFull": "Check if opportunity has reached capacity",
+    "volunteerNotEligible": "Check if volunteer meets minimum requirements"
+  },
+  "actions": {
+    "notifyOrganization": "Send notification to organization about new application",
+    "notifyVolunteer": "Send notification to volunteer about status change",
+    "notifyReviewer": "Send notification to assigned reviewer",
+    "assignReviewer": "Assign a reviewer to the application",
+    "reserveSpot": "Reserve a spot for the volunteer in the opportunity",
+    "releaseSpot": "Release the reserved spot",
+    "awardPoints": "Award gamification points to volunteer",
+    "generateCertificate": "Generate completion certificate",
+    "recordHours": "Record volunteer hours in system",
+    "checkBadgeEligibility": "Check if volunteer earned any new badges",
+    "updateVolunteerStats": "Update volunteer's overall statistics",
+    "createSubmissionRecord": "Create audit record of submission",
+    "createAcceptanceRecord": "Create audit record of acceptance",
+    "recordRejectionReason": "Record the reason for rejection",
+    "recordCancellationReason": "Record the reason for cancellation",
+    "recordCompletionHours": "Record the hours completed for this opportunity",
+    "recordFinalStatus": "Record final status in audit log",
+    "recordCancellationStats": "Update cancellation statistics"
+  }
+}

@@ -1,0 +1,233 @@
+openapi: 3.0.3
+info:
+  title: Seraaj BFF API
+  description: Backend for Frontend API for the Seraaj volunteer platform
+  version: 1.0.0
+  contact:
+    name: Seraaj Team
+    url: https://seraaj.org
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+servers:
+  - url: http://localhost:8000/api
+    description: Development server
+
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Health check endpoint
+      tags:
+        - System
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy]
+                  timestamp:
+                    type: string
+                    format: date-time
+                  version:
+                    type: string
+        '503':
+          description: Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /volunteer/quick-match:
+    post:
+      operationId: getQuickMatch
+      summary: Get quick match suggestions for a volunteer
+      tags:
+        - Volunteer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [volunteerId]
+              properties:
+                volunteerId:
+                  type: string
+                  format: uuid
+                  description: ID of the volunteer requesting matches
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 50
+                  default: 10
+                  description: Maximum number of matches to return
+      responses:
+        '200':
+          description: Match suggestions returned successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: './schemas/match-suggestion.yaml'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Volunteer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /volunteer/apply:
+    post:
+      operationId: submitApplication
+      summary: Submit a volunteer application
+      tags:
+        - Volunteer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './schemas/submit-application.yaml'
+      responses:
+        '201':
+          description: Application submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: './schemas/application.yaml'
+        '400':
+          description: Invalid application data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Volunteer or opportunity not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Application already exists or opportunity is full
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /volunteer/{volunteerId}/dashboard:
+    get:
+      operationId: getVolunteerDashboard
+      summary: Get volunteer dashboard data
+      tags:
+        - Volunteer
+      parameters:
+        - name: volunteerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the volunteer
+      responses:
+        '200':
+          description: Dashboard data returned successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [profile, activeApplications, recentMatches]
+                properties:
+                  profile:
+                    $ref: './schemas/volunteer-profile-view.yaml'
+                  activeApplications:
+                    type: array
+                    items:
+                      $ref: './schemas/application.yaml'
+                    description: Applications that are not in final state
+                  recentMatches:
+                    type: array
+                    items:
+                      $ref: './schemas/match-suggestion.yaml'
+                    description: Recent match suggestions for the volunteer
+        '400':
+          description: Invalid volunteer ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Volunteer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          description: Error code or type
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: object
+          description: Additional error details
+        timestamp:
+          type: string
+          format: date-time
+          description: When the error occurred
+        requestId:
+          type: string
+          description: Unique request identifier for tracking
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: System
+    description: System health and status endpoints
+  - name: Volunteer
+    description: Volunteer-related operations
