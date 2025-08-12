@@ -183,9 +183,9 @@ jobs:
         
     - name: Start Matching Service  
       run: |
-        cd services/matching && uvicorn api:app --host 127.0.0.1 --port 8002 &
+        cd services/matching && uvicorn api:app --host 127.0.0.1 --port 8003 &
         sleep 10
-        curl --retry 10 --retry-delay 2 --retry-connrefused http://127.0.0.1:8002/health
+        curl --retry 10 --retry-delay 2 --retry-connrefused http://127.0.0.1:8003/health
       env:
         REDIS_URL: redis://localhost:6379
         
@@ -268,17 +268,23 @@ jobs:
       run: |
         # Start services in background
         cd services/applications && uvicorn api:app --host 127.0.0.1 --port 8001 &
-        cd services/matching && uvicorn api:app --host 127.0.0.1 --port 8002 &
+        cd services/matching && uvicorn api:app --host 127.0.0.1 --port 8003 &
         cd services/auth && uvicorn api:app --host 127.0.0.1 --port 8004 &
+        cd services/volunteers && uvicorn api:app --host 127.0.0.1 --port 8005 &
+        cd services/opportunities && uvicorn api:app --host 127.0.0.1 --port 8006 &
+        cd services/organizations && uvicorn api:app --host 127.0.0.1 --port 8007 &
         uvicorn bff.main:app --host 127.0.0.1 --port 8000 &
         
         # Wait for services to start
-        sleep 20
+        sleep 30
         
         # Verify all services are running
         curl --retry 5 --retry-connrefused http://127.0.0.1:8001/health
-        curl --retry 5 --retry-connrefused http://127.0.0.1:8002/health  
+        curl --retry 5 --retry-connrefused http://127.0.0.1:8003/health  
         curl --retry 5 --retry-connrefused http://127.0.0.1:8004/health
+        curl --retry 5 --retry-connrefused http://127.0.0.1:8005/health
+        curl --retry 5 --retry-connrefused http://127.0.0.1:8006/health
+        curl --retry 5 --retry-connrefused http://127.0.0.1:8007/health
         curl --retry 5 --retry-connrefused http://127.0.0.1:8000/api/health
       env:
         DATABASE_URL: postgresql://test:test@localhost:5432/seraaj_test
@@ -392,8 +398,11 @@ jobs:
       run: |
         # Start all services
         cd services/applications && uvicorn api:app --host 127.0.0.1 --port 8001 &
-        cd services/matching && uvicorn api:app --host 127.0.0.1 --port 8002 &
+        cd services/matching && uvicorn api:app --host 127.0.0.1 --port 8003 &
         cd services/auth && uvicorn api:app --host 127.0.0.1 --port 8004 &
+        cd services/volunteers && uvicorn api:app --host 127.0.0.1 --port 8005 &
+        cd services/opportunities && uvicorn api:app --host 127.0.0.1 --port 8006 &
+        cd services/organizations && uvicorn api:app --host 127.0.0.1 --port 8007 &
         uvicorn bff.main:app --host 127.0.0.1 --port 8000 &
         sleep 30
       env:

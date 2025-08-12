@@ -86,6 +86,10 @@
         ".gitignore"
       ],
       "checkpoint_file": "frontend.done"
+    },
+    "RELEASE_CAPTAIN": {
+      "allowed_paths": ["**"],
+      "checkpoint_file": "release.done"
     }
   }
 }

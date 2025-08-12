@@ -156,7 +156,7 @@ def main():
     validator = APIContractValidator(base_url)
     
     # Load OpenAPI specifications
-    contracts_dir = Path(__file__).parent.parent.parent / "contracts" / "v1.0.0" / "api"
+    contracts_dir = Path(__file__).parent.parent.parent / "contracts" / "v1.1.0" / "api"
     bff_spec_path = contracts_dir / "bff.openapi.yaml"
     schemas_dir = contracts_dir / "schemas"
     
