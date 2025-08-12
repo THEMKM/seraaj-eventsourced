@@ -583,7 +583,7 @@ class ComprehensiveDriftDetector:
         services = [
             ("BFF", "http://localhost:8000/api/health"),
             ("Applications", "http://localhost:8001/health", True),  # Optional
-            ("Matching", "http://localhost:8002/health", True),      # Optional
+            ("Matching", "http://localhost:8003/health", True),      # Optional
         ]
         
         for service_info in services:

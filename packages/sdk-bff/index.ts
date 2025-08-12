@@ -1,9 +1,9 @@
 /**
  * @seraaj/sdk-bff - TypeScript SDK for Seraaj BFF API
- * Auto-generated from OpenAPI specification
+ * Generated from OpenAPI specification v1.1.0
  */
 
 export * from './src/runtime';
 export * from './src/types';
 export * from './src/apis';
-export { makeBffConfig } from './src/client';
+export * from './src/client';

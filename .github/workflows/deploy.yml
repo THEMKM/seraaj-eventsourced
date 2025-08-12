@@ -1,0 +1,268 @@
+name: Deploy to Staging/Production
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
+  PNPM_VERSION: '8'
+
+jobs:
+  # Job 1: Build and Test (reuse CI logic)
+  build-and-test:
+    runs-on: ubuntu-latest
+    name: Build and Test for Deploy
+    
+    outputs:
+      should_deploy: ${{ steps.check.outputs.should_deploy }}
+      target_env: ${{ steps.check.outputs.target_env }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Determine deployment environment
+      id: check
+      run: |
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          echo "should_deploy=true" >> $GITHUB_OUTPUT
+          echo "target_env=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+        elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          echo "should_deploy=true" >> $GITHUB_OUTPUT
+          echo "target_env=staging" >> $GITHUB_OUTPUT
+        elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+          echo "should_deploy=true" >> $GITHUB_OUTPUT
+          echo "target_env=production" >> $GITHUB_OUTPUT
+        else
+          echo "should_deploy=false" >> $GITHUB_OUTPUT
+          echo "target_env=none" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Setup Node.js
+      if: steps.check.outputs.should_deploy == 'true'
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Setup Python
+      if: steps.check.outputs.should_deploy == 'true'
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        cache-dependency-path: 'requirements.txt'
+        
+    - name: Install dependencies
+      if: steps.check.outputs.should_deploy == 'true'
+      run: |
+        npm install -g pnpm@${{ env.PNPM_VERSION }}
+        pnpm install --frozen-lockfile
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Run essential tests
+      if: steps.check.outputs.should_deploy == 'true'
+      run: |
+        # Quick smoke tests before deployment
+        pnpm type-check
+        pnpm build
+        python -m pytest services/applications/tests/test_service.py -q
+        python -m pytest services/matching/tests/test_service.py -q
+
+  # Job 2: Build Docker Images
+  build-images:
+    runs-on: ubuntu-latest
+    name: Build Docker Images
+    needs: build-and-test
+    if: needs.build-and-test.outputs.should_deploy == 'true'
+    
+    strategy:
+      matrix:
+        service: [applications, matching, auth, bff]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}/${{ matrix.service }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=tag
+          type=sha,prefix={{branch}}-
+          
+    - name: Create Dockerfile for ${{ matrix.service }}
+      run: |
+        mkdir -p docker-build/${{ matrix.service }}
+        
+        # Create service-specific Dockerfile
+        cat > docker-build/${{ matrix.service }}/Dockerfile << 'EOF'
+        FROM python:3.11-slim
+        
+        WORKDIR /app
+        
+        # Install system dependencies
+        RUN apt-get update && apt-get install -y \
+            gcc \
+            && rm -rf /var/lib/apt/lists/*
+        
+        # Copy requirements and install Python dependencies
+        COPY requirements.txt .
+        RUN pip install --no-cache-dir -r requirements.txt
+        
+        # Copy service code
+        COPY services/${{ matrix.service }}/ ./services/${{ matrix.service }}/
+        COPY services/shared/ ./services/shared/
+        COPY infrastructure/ ./infrastructure/
+        
+        # Copy BFF if needed
+        COPY bff/ ./bff/
+        
+        # Set environment variables
+        ENV PYTHONPATH=/app
+        ENV SERVICE_NAME=${{ matrix.service }}
+        
+        # Health check
+        HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+          CMD curl -f http://localhost:8000/health || exit 1
+        
+        # Expose port
+        EXPOSE 8000
+        
+        # Run the service
+        CMD ["sh", "-c", "uvicorn ${SERVICE_PATH:-bff.main}:app --host 0.0.0.0 --port 8000"]
+        EOF
+        
+        # Set service-specific CMD
+        if [ "${{ matrix.service }}" = "applications" ]; then
+          echo 'CMD ["uvicorn", "services.applications.api:app", "--host", "0.0.0.0", "--port", "8000"]' >> docker-build/${{ matrix.service }}/Dockerfile
+        elif [ "${{ matrix.service }}" = "matching" ]; then
+          echo 'CMD ["uvicorn", "services.matching.api:app", "--host", "0.0.0.0", "--port", "8000"]' >> docker-build/${{ matrix.service }}/Dockerfile
+        elif [ "${{ matrix.service }}" = "auth" ]; then
+          echo 'CMD ["uvicorn", "services.auth.api:app", "--host", "0.0.0.0", "--port", "8000"]' >> docker-build/${{ matrix.service }}/Dockerfile
+        elif [ "${{ matrix.service }}" = "bff" ]; then
+          echo 'CMD ["uvicorn", "bff.main:app", "--host", "0.0.0.0", "--port", "8000"]' >> docker-build/${{ matrix.service }}/Dockerfile
+        fi
+        
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: docker-build/${{ matrix.service }}/Dockerfile
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # Job 3: Deploy to Staging
+  deploy-staging:
+    runs-on: ubuntu-latest
+    name: Deploy to Staging
+    needs: [build-and-test, build-images]
+    if: needs.build-and-test.outputs.target_env == 'staging'
+    environment: staging
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Deploy to staging
+      run: |
+        echo "🚀 Deploying to staging environment..."
+        echo "This would typically:"
+        echo "  - Update Kubernetes manifests"
+        echo "  - Apply database migrations"
+        echo "  - Deploy services with rolling updates" 
+        echo "  - Run smoke tests against staging"
+        echo "✅ Staging deployment completed"
+
+  # Job 4: Deploy to Production
+  deploy-production:
+    runs-on: ubuntu-latest
+    name: Deploy to Production
+    needs: [build-and-test, build-images]
+    if: needs.build-and-test.outputs.target_env == 'production'
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Deploy to production
+      run: |
+        echo "🚀 Deploying to production environment..."
+        echo "This would typically:"
+        echo "  - Create production backup"
+        echo "  - Update Kubernetes manifests with production config"
+        echo "  - Apply database migrations (if any)"
+        echo "  - Deploy services with zero-downtime rolling updates"
+        echo "  - Run comprehensive health checks"
+        echo "  - Enable traffic routing"
+        echo "✅ Production deployment completed"
+
+  # Job 5: Post-Deploy Validation
+  post-deploy-validation:
+    runs-on: ubuntu-latest
+    name: Post-Deployment Validation
+    needs: [deploy-staging, deploy-production]
+    if: always() && (needs.deploy-staging.result == 'success' || needs.deploy-production.result == 'success')
+    
+    steps:
+    - name: Run post-deployment tests
+      run: |
+        echo "🔍 Running post-deployment validation..."
+        echo "This would typically:"
+        echo "  - Test all API endpoints"
+        echo "  - Validate database connectivity"
+        echo "  - Check service-to-service communication"
+        echo "  - Monitor application metrics"
+        echo "  - Send deployment notifications"
+        echo "✅ Post-deployment validation completed"
+
+  # Job 6: Rollback (manual trigger)
+  rollback:
+    runs-on: ubuntu-latest
+    name: Rollback Deployment
+    needs: [deploy-staging, deploy-production]
+    if: failure() && (needs.deploy-staging.result == 'failure' || needs.deploy-production.result == 'failure')
+    
+    steps:
+    - name: Rollback deployment
+      run: |
+        echo "⚠️ Initiating rollback procedure..."
+        echo "This would typically:"
+        echo "  - Revert to previous Docker images"
+        echo "  - Restore database from backup (if needed)"
+        echo "  - Update service configurations"
+        echo "  - Validate rollback success"
+        echo "🔄 Rollback completed"

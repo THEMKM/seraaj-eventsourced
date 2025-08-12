@@ -1,3 +1,5 @@
+import os
+import logging
 from typing import List, Dict, Any
 from uuid import uuid4
 from datetime import datetime, UTC
@@ -6,12 +8,33 @@ from services.shared.models import MatchSuggestion
 from .algorithm import MatchingAlgorithm
 from .repository import MatchRepository
 
+try:
+    from infrastructure.event_bus import RedisEventBus
+    from infrastructure.event_types import EventTypes
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+
+logger = logging.getLogger(__name__)
+
+
 class MatchingService:
-    """Matching domain service"""
+    """Matching domain service with event publishing"""
     
     def __init__(self):
         self.algorithm = MatchingAlgorithm()
         self.repository = MatchRepository()
+        
+        # Event publishing setup
+        self.use_redis = os.getenv("USE_REDIS_EVENTS", "true").lower() == "true"
+        self.redis_bus = None
+        
+        if self.use_redis and REDIS_AVAILABLE:
+            try:
+                self.redis_bus = RedisEventBus()
+            except Exception as e:
+                logger.warning(f"Failed to initialize Redis event bus: {e}")
+                self.redis_bus = None
     
     async def quick_match(
         self,
@@ -52,6 +75,9 @@ class MatchingService:
             await self.repository.save(suggestion)
             suggestions.append(suggestion)
         
+        # Publish match generation event
+        await self._publish_match_suggestions_generated(volunteer_id, suggestions)
+        
         return suggestions
     
     async def generate_matches(
@@ -86,6 +112,9 @@ class MatchingService:
             )
             await self.repository.save(suggestion)
             suggestions.append(suggestion)
+        
+        # Publish match generation event
+        await self._publish_match_suggestions_generated(volunteer_id, suggestions)
         
         return suggestions
     
@@ -205,3 +234,58 @@ class MatchingService:
                 ]
         
         return opportunities
+    
+    # Event publishing helper methods
+    async def _publish_match_suggestions_generated(self, volunteer_id: str, suggestions: List[MatchSuggestion]):
+        """Publish event when match suggestions are generated"""
+        if not self.redis_bus:
+            return
+        
+        try:
+            await self.redis_bus.publish(
+                EventTypes.MATCH_SUGGESTIONS_GENERATED,
+                {
+                    "volunteerId": volunteer_id,
+                    "matchCount": len(suggestions),
+                    "matches": [
+                        {
+                            "id": s.id,
+                            "opportunityId": s.opportunityId,
+                            "organizationId": s.organizationId,
+                            "score": s.score,
+                            "explanation": s.explanation
+                        }
+                        for s in suggestions
+                    ],
+                    "generatedAt": datetime.now(UTC).isoformat()
+                },
+                source_service="matching"
+            )
+            logger.info(f"Published match suggestions generated event for volunteer {volunteer_id}")
+        except Exception as e:
+            logger.error(f"Failed to publish match suggestions event: {e}")
+    
+    async def publish_match_suggestion_applied(self, suggestion_id: str, volunteer_id: str, opportunity_id: str):
+        """Publish event when volunteer applies to a matched opportunity"""
+        if not self.redis_bus:
+            return
+            
+        try:
+            await self.redis_bus.publish(
+                EventTypes.MATCH_SUGGESTION_APPLIED,
+                {
+                    "suggestionId": suggestion_id,
+                    "volunteerId": volunteer_id,
+                    "opportunityId": opportunity_id,
+                    "appliedAt": datetime.now(UTC).isoformat()
+                },
+                source_service="matching"
+            )
+            logger.info(f"Published match suggestion applied event: {suggestion_id}")
+        except Exception as e:
+            logger.error(f"Failed to publish match applied event: {e}")
+    
+    async def close(self):
+        """Close event bus connections"""
+        if self.redis_bus:
+            await self.redis_bus.close()

@@ -17,8 +17,12 @@ services:
     ports:
       - "6379:6379"
     
-  api-gateway:
-    build: ./infrastructure/gateway
+  bff:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./:/app
+    command: python -m bff.main
     ports:
       - "8000:8000"
     depends_on:

@@ -20,6 +20,52 @@
       "allowed_paths": ["services/volunteers/**"],
       "checkpoint_file": "volunteers.done"
     },
+    "SERVICE_BUILDER_OPPORTUNITIES": {
+      "allowed_paths": ["services/opportunities/**"],
+      "checkpoint_file": "opportunities.done"
+    },
+    "SERVICE_BUILDER_ORGANIZATIONS": {
+      "allowed_paths": ["services/organizations/**"],
+      "checkpoint_file": "organizations.done"
+    },
+    "SERVICE_BUILDER_AUTH": {
+      "allowed_paths": ["services/auth/**"],
+      "checkpoint_file": "auth.done"
+    },
+    "DATA_LAYER_MIGRATOR": {
+      "allowed_paths": [
+        "infrastructure/db/**", 
+        "tools/migrations/**", 
+        "services/applications/repository.py", 
+        "services/matching/repository.py"
+      ],
+      "checkpoint_file": "persistence.done"
+    },
+    "INFRA_EVENTBUS": {
+      "allowed_paths": [
+        "infrastructure/event_bus.py", 
+        "services/applications/events.py", 
+        "services/matching/service.py", 
+        "bff/health_events.py"
+      ],
+      "checkpoint_file": "eventbus.done"
+    },
+    "OBSERVABILITY_BASELINE": {
+      "allowed_paths": [
+        "services/applications/*.py",
+        "services/matching/*.py", 
+        "services/auth/*.py",
+        "services/volunteers/*.py",
+        "services/opportunities/*.py",
+        "services/organizations/*.py",
+        "bff/*.py"
+      ],
+      "checkpoint_file": "observability.done"
+    },
+    "CI_ENFORCER": {
+      "allowed_paths": [".github/workflows/**", "tools/validators/**", "tools/ci/**", ".agents/checkpoints/ci.done", ".agents/runs/CI_ENFORCER/**"],
+      "checkpoint_file": "ci.done"
+    },
     "ORCHESTRATOR": {
       "allowed_paths": ["bff/**", "infrastructure/**"],
       "checkpoint_file": "orchestration.done"
@@ -40,6 +86,10 @@
         ".gitignore"
       ],
       "checkpoint_file": "frontend.done"
+    },
+    "RELEASE_CAPTAIN": {
+      "allowed_paths": ["**"],
+      "checkpoint_file": "release.done"
     }
   }
 }

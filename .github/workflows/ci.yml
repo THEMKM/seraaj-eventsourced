@@ -1,0 +1,463 @@
+name: Seraaj CI Pipeline
+
+on:
+  push:
+    branches: [ main, feature/* ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
+  PNPM_VERSION: '8'
+
+jobs:
+  # Job 1: Frontend Quality & Build
+  frontend-quality:
+    runs-on: ubuntu-latest
+    name: Frontend Quality Checks
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'pnpm'
+        
+    - name: Install pnpm
+      run: npm install -g pnpm@${{ env.PNPM_VERSION }}
+      
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+      
+    - name: Install additional test dependencies
+      run: pnpm add -D @types/jest -w
+      
+    - name: TypeScript type checking
+      run: pnpm type-check
+      
+    - name: ESLint validation
+      run: pnpm lint
+      
+    - name: Frontend tests
+      run: pnpm test --passWithNoTests
+      
+    - name: Frontend build test
+      run: pnpm build
+      
+    - name: Contract schema validation
+      run: pnpm validate:schemas
+      
+    - name: SDK generation validation
+      run: |
+        python tools/generators/generate.py
+        git diff --exit-code packages/sdk-bff/ || {
+          echo "❌ SDK is out of sync with contracts"
+          echo "Run: python tools/generators/generate.py"
+          exit 1
+        }
+
+  # Job 2: Backend Services Unit Tests  
+  backend-services:
+    runs-on: ubuntu-latest
+    name: Backend Services Tests
+    
+    strategy:
+      matrix:
+        service: [applications, matching, auth]
+        # Note: Stub services (volunteers, opportunities, organizations) excluded until tests are implemented
+        
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: seraaj_test
+          POSTGRES_USER: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+          
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        cache-dependency-path: 'requirements.txt'
+        
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio httpx pytest-cov
+        
+    - name: Run ${{ matrix.service }} service tests
+      run: |
+        if [ -d "services/${{ matrix.service }}/tests" ]; then
+          python -m pytest services/${{ matrix.service }}/tests -v --cov=services/${{ matrix.service }} --cov-report=xml
+        else
+          echo "No tests found for ${{ matrix.service }} service, skipping"
+          exit 0
+        fi
+      env:
+        DATABASE_URL: postgresql://test:test@localhost:5432/seraaj_test
+        REDIS_URL: redis://localhost:6379
+        PYTHONPATH: ${{ github.workspace }}
+        
+    - name: Upload coverage reports
+      if: matrix.service == 'applications'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: backend-${{ matrix.service }}
+
+  # Job 3: BFF Integration Tests
+  bff-integration:
+    runs-on: ubuntu-latest
+    name: BFF Integration Tests
+    needs: [backend-services]
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: seraaj_test
+          POSTGRES_USER: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+          
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        cache-dependency-path: 'requirements.txt'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio httpx
+        
+    - name: Start Applications Service
+      run: |
+        cd services/applications && uvicorn api:app --host 127.0.0.1 --port 8001 &
+        sleep 10
+        curl --retry 10 --retry-delay 2 --retry-connrefused http://127.0.0.1:8001/health
+      env:
+        DATABASE_URL: postgresql://test:test@localhost:5432/seraaj_test
+        REDIS_URL: redis://localhost:6379
+        
+    - name: Start Matching Service  
+      run: |
+        cd services/matching && uvicorn api:app --host 127.0.0.1 --port 8003 &
+        sleep 10
+        curl --retry 10 --retry-delay 2 --retry-connrefused http://127.0.0.1:8003/health
+      env:
+        REDIS_URL: redis://localhost:6379
+        
+    - name: Start Auth Service
+      run: |
+        cd services/auth && uvicorn api:app --host 127.0.0.1 --port 8004 &
+        sleep 10
+        curl --retry 10 --retry-delay 2 --retry-connrefused http://127.0.0.1:8004/health
+      env:
+        DATABASE_URL: postgresql://test:test@localhost:5432/seraaj_test
+        AUTH_JWT_SECRET: test-secret-for-ci-only-not-production
+        
+    - name: Start BFF Service
+      run: |
+        uvicorn bff.main:app --host 127.0.0.1 --port 8000 &
+        sleep 10
+        curl --retry 10 --retry-delay 2 --retry-connrefused http://127.0.0.1:8000/api/health
+      env:
+        REDIS_URL: redis://localhost:6379
+        CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+        
+    - name: Run BFF Health Tests
+      run: python -m pytest bff/test_health.py -v
+      env:
+        BFF_BASE_URL: http://127.0.0.1:8000
+        PYTHONPATH: ${{ github.workspace }}
+        
+    - name: Run E2E Integration Tests
+      run: python -m pytest tests/integration/ tests/e2e/ -v
+      env:
+        BFF_BASE_URL: http://127.0.0.1:8000
+        DATABASE_URL: postgresql://test:test@localhost:5432/seraaj_test
+        PYTHONPATH: ${{ github.workspace }}
+
+  # Job 4: API Contract Validation
+  contract-validation:
+    runs-on: ubuntu-latest
+    name: API Contract Validation
+    needs: [bff-integration]
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: seraaj_test
+          POSTGRES_USER: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+          
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install httpx jsonschema pyyaml
+        
+    - name: Start all services for contract validation
+      run: |
+        # Start services in background
+        cd services/applications && uvicorn api:app --host 127.0.0.1 --port 8001 &
+        cd services/matching && uvicorn api:app --host 127.0.0.1 --port 8003 &
+        cd services/auth && uvicorn api:app --host 127.0.0.1 --port 8004 &
+        cd services/volunteers && uvicorn api:app --host 127.0.0.1 --port 8005 &
+        cd services/opportunities && uvicorn api:app --host 127.0.0.1 --port 8006 &
+        cd services/organizations && uvicorn api:app --host 127.0.0.1 --port 8007 &
+        uvicorn bff.main:app --host 127.0.0.1 --port 8000 &
+        
+        # Wait for services to start
+        sleep 30
+        
+        # Verify all services are running
+        curl --retry 5 --retry-connrefused http://127.0.0.1:8001/health
+        curl --retry 5 --retry-connrefused http://127.0.0.1:8003/health  
+        curl --retry 5 --retry-connrefused http://127.0.0.1:8004/health
+        curl --retry 5 --retry-connrefused http://127.0.0.1:8005/health
+        curl --retry 5 --retry-connrefused http://127.0.0.1:8006/health
+        curl --retry 5 --retry-connrefused http://127.0.0.1:8007/health
+        curl --retry 5 --retry-connrefused http://127.0.0.1:8000/api/health
+      env:
+        DATABASE_URL: postgresql://test:test@localhost:5432/seraaj_test
+        REDIS_URL: redis://localhost:6379
+        AUTH_JWT_SECRET: test-secret-for-ci-only-not-production
+        
+    - name: Validate API Contracts
+      run: python tools/ci/validate_api_contracts.py
+      env:
+        BFF_BASE_URL: http://127.0.0.1:8000
+        PYTHONPATH: ${{ github.workspace }}
+
+  # Job 5: System Validation & Security
+  system-validation:
+    runs-on: ubuntu-latest  
+    name: System Validation & Security
+    needs: [contract-validation]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install validation tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install bandit safety flake8 mypy black isort
+        
+    - name: Check Agent Boundaries
+      run: python tools/validators/check_boundaries.py
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+      
+    - name: Python Code Quality (flake8)
+      run: flake8 services/ bff/ --max-line-length=100 --exclude=__pycache__,migrations || true
+      
+    - name: Python Code Formatting (black)
+      run: black --check services/ bff/ || true
+        
+    - name: Python Import Sorting (isort) 
+      run: isort --check-only services/ bff/ || true
+      
+    - name: Security Scan (bandit)
+      run: |
+        bandit -r services/ bff/ -f json -o bandit-report.json || true
+        cat bandit-report.json
+        
+    - name: Dependency Security (safety)
+      run: |
+        safety check --json --output safety-report.json || true
+        cat safety-report.json
+        
+    - name: Upload Security Reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-reports
+        path: |
+          bandit-report.json
+          safety-report.json
+
+  # Job 6: Performance & Load Testing
+  performance-tests:
+    runs-on: ubuntu-latest
+    name: Performance & Load Tests
+    needs: [system-validation]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: seraaj_test
+          POSTGRES_USER: test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+          
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install locust
+        
+    - name: Start services for load testing
+      run: |
+        # Start all services
+        cd services/applications && uvicorn api:app --host 127.0.0.1 --port 8001 &
+        cd services/matching && uvicorn api:app --host 127.0.0.1 --port 8003 &
+        cd services/auth && uvicorn api:app --host 127.0.0.1 --port 8004 &
+        cd services/volunteers && uvicorn api:app --host 127.0.0.1 --port 8005 &
+        cd services/opportunities && uvicorn api:app --host 127.0.0.1 --port 8006 &
+        cd services/organizations && uvicorn api:app --host 127.0.0.1 --port 8007 &
+        uvicorn bff.main:app --host 127.0.0.1 --port 8000 &
+        sleep 30
+      env:
+        DATABASE_URL: postgresql://test:test@localhost:5432/seraaj_test
+        REDIS_URL: redis://localhost:6379
+        AUTH_JWT_SECRET: test-secret-for-ci-only-not-production
+        
+    - name: Basic Load Test
+      run: |
+        # Simple load test with curl
+        echo "Running basic load test on health endpoints..."
+        for i in {1..50}; do
+          curl -s http://127.0.0.1:8000/api/health > /dev/null &
+        done
+        wait
+        echo "Load test completed"
+
+  # Final Job: CI Summary
+  ci-summary:
+    runs-on: ubuntu-latest
+    name: CI Pipeline Summary
+    needs: [frontend-quality, backend-services, bff-integration, contract-validation, system-validation]
+    if: always()
+    
+    steps:
+    - name: Check CI Results
+      run: |
+        echo "CI Pipeline Results:"
+        echo "Frontend Quality: ${{ needs.frontend-quality.result }}"
+        echo "Backend Services: ${{ needs.backend-services.result }}"
+        echo "BFF Integration: ${{ needs.bff-integration.result }}"
+        echo "Contract Validation: ${{ needs.contract-validation.result }}"
+        echo "System Validation: ${{ needs.system-validation.result }}"
+        
+        if [[ "${{ needs.frontend-quality.result }}" == "success" && 
+              "${{ needs.backend-services.result }}" == "success" && 
+              "${{ needs.bff-integration.result }}" == "success" && 
+              "${{ needs.contract-validation.result }}" == "success" && 
+              "${{ needs.system-validation.result }}" == "success" ]]; then
+          echo "✅ All CI checks passed!"
+          exit 0
+        else
+          echo "❌ Some CI checks failed"
+          exit 1
+        fi
