@@ -62,7 +62,8 @@
       "Bash(powershell:*)",
       "Bash(timeout:*)",
       "Bash(tskill:*)",
-      "Bash(git tag:*)"
+      "Bash(git tag:*)",
+      "Bash(export SERAJ_AGENT=RELEASE_CAPTAIN)"
     ],
     "deny": []
   }

@@ -13,6 +13,7 @@
     "lint": "pnpm -r lint",
     "type-check": "pnpm -r type-check",
     "build": "pnpm -r build",
+    "test": "pnpm -r test --passWithNoTests",
     "check:all": "pnpm run type-check && pnpm run lint && pnpm run build && python tools/validators/validate.py && pytest -q",
     "smoke": "powershell -ExecutionPolicy Bypass -File tools/smoke/smoke.ps1"
   },

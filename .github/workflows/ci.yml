@@ -25,7 +25,7 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
+        cache: 'pnpm'
         
     - name: Install pnpm
       run: npm install -g pnpm@${{ env.PNPM_VERSION }}
@@ -38,6 +38,9 @@ jobs:
       
     - name: ESLint validation
       run: pnpm lint
+      
+    - name: Frontend tests
+      run: pnpm test --passWithNoTests
       
     - name: Frontend build test
       run: pnpm build
@@ -62,6 +65,7 @@ jobs:
     strategy:
       matrix:
         service: [applications, matching, auth]
+        # Note: Stub services (volunteers, opportunities, organizations) excluded until tests are implemented
         
     services:
       postgres:
@@ -108,7 +112,7 @@ jobs:
     - name: Run ${{ matrix.service }} service tests
       run: |
         if [ -d "services/${{ matrix.service }}/tests" ]; then
-          pytest services/${{ matrix.service }}/tests -v --cov=services/${{ matrix.service }} --cov-report=xml
+          PYTHONPATH=$PWD pytest services/${{ matrix.service }}/tests -v --cov=services/${{ matrix.service }} --cov-report=xml
         else
           echo "No tests found for ${{ matrix.service }} service, skipping"
           exit 0
@@ -116,6 +120,7 @@ jobs:
       env:
         DATABASE_URL: postgresql://test:test@localhost:5432/seraaj_test
         REDIS_URL: redis://localhost:6379
+        PYTHONPATH: ${{ github.workspace }}
         
     - name: Upload coverage reports
       if: matrix.service == 'applications'
@@ -211,12 +216,14 @@ jobs:
       run: pytest bff/test_health.py -v
       env:
         BFF_BASE_URL: http://127.0.0.1:8000
+        PYTHONPATH: ${{ github.workspace }}
         
     - name: Run E2E Integration Tests
       run: pytest tests/integration/ tests/e2e/ -v
       env:
         BFF_BASE_URL: http://127.0.0.1:8000
         DATABASE_URL: postgresql://test:test@localhost:5432/seraaj_test
+        PYTHONPATH: ${{ github.workspace }}
 
   # Job 4: API Contract Validation
   contract-validation:
@@ -295,6 +302,7 @@ jobs:
       run: python tools/ci/validate_api_contracts.py
       env:
         BFF_BASE_URL: http://127.0.0.1:8000
+        PYTHONPATH: ${{ github.workspace }}
 
   # Job 5: System Validation & Security
   system-validation:
@@ -318,6 +326,8 @@ jobs:
         
     - name: Check Agent Boundaries
       run: python tools/validators/check_boundaries.py
+      env:
+        PYTHONPATH: ${{ github.workspace }}
       
     - name: Python Code Quality (flake8)
       run: flake8 services/ bff/ --max-line-length=100 --exclude=__pycache__,migrations || true
