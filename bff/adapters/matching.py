@@ -9,7 +9,7 @@ from fastapi import HTTPException
 class MatchingAdapter:
     """HTTP client adapter for Matching service"""
     
-    def __init__(self, base_url: str = "http://localhost:8002"):
+    def __init__(self, base_url: str = "http://localhost:8003"):
         self.base_url = base_url.rstrip('/')
         self.timeout = 30.0
     

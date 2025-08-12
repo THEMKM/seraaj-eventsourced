@@ -1,0 +1,568 @@
+openapi: 3.0.3
+info:
+  title: Seraaj BFF API
+  description: Backend for Frontend API for the Seraaj volunteer platform
+  version: 1.1.0
+  contact:
+    name: Seraaj Team
+    url: https://seraaj.org
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+servers:
+  - url: http://localhost:8000/api
+    description: Development server
+
+security:
+  - BearerAuth: []
+
+paths:
+  # Auth endpoints (proxy to auth service)
+  /auth/register:
+    post:
+      operationId: registerUser
+      summary: Register a new user account
+      description: Create a new user account with email and password
+      tags:
+        - Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ["email", "password", "name", "role"]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: User's email address
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 128
+                  description: User's password (minimum 8 characters)
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                  description: User's full name
+                role:
+                  type: string
+                  enum: ["VOLUNTEER", "ORG_ADMIN"]
+                  description: User's role
+              additionalProperties: false
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: ["user", "tokens"]
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  tokens:
+                    $ref: '#/components/schemas/AuthTokens'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      operationId: loginUser
+      summary: Login with email and password
+      description: Authenticate user and return access tokens
+      tags:
+        - Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ["email", "password"]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: User's email address
+                password:
+                  type: string
+                  description: User's password
+              additionalProperties: false
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                required: ["user", "tokens"]
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  tokens:
+                    $ref: '#/components/schemas/AuthTokens'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/refresh:
+    post:
+      operationId: refreshTokens
+      summary: Refresh access token
+      description: Exchange refresh token for new access and refresh tokens
+      tags:
+        - Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ["refreshToken"]
+              properties:
+                refreshToken:
+                  type: string
+                  description: Valid refresh token
+              additionalProperties: false
+      responses:
+        '200':
+          description: Tokens refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokens'
+        '401':
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      summary: Get current user profile
+      description: Retrieve the authenticated user's profile information
+      tags:
+        - Authentication
+      responses:
+        '200':
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # System endpoints
+  /health:
+    get:
+      operationId: getHealth
+      summary: Health check endpoint
+      tags:
+        - System
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy]
+                  timestamp:
+                    type: string
+                    format: date-time
+                  version:
+                    type: string
+        '503':
+          description: Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Volunteer endpoints
+  /volunteer/quick-match:
+    post:
+      operationId: getQuickMatch
+      summary: Get quick match suggestions for a volunteer
+      tags:
+        - Volunteer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [volunteerId]
+              properties:
+                volunteerId:
+                  type: string
+                  format: uuid
+                  description: ID of the volunteer requesting matches
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 50
+                  default: 10
+                  description: Maximum number of matches to return
+      responses:
+        '200':
+          description: Match suggestions returned successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MatchSuggestion'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Volunteer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /volunteer/apply:
+    post:
+      operationId: submitApplication
+      summary: Submit a volunteer application
+      tags:
+        - Volunteer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [volunteerId, opportunityId]
+              properties:
+                volunteerId:
+                  type: string
+                  format: uuid
+                  description: ID of the volunteer applying
+                opportunityId:
+                  type: string
+                  format: uuid
+                  description: ID of the opportunity being applied to
+                message:
+                  type: string
+                  maxLength: 1000
+                  description: Optional message from the volunteer
+      responses:
+        '201':
+          description: Application submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Application'
+        '400':
+          description: Invalid request or already applied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Volunteer or opportunity not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /volunteer/{volunteerId}/dashboard:
+    get:
+      operationId: getVolunteerDashboard
+      summary: Get volunteer dashboard data
+      tags:
+        - Volunteer
+      parameters:
+        - name: volunteerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the volunteer
+      responses:
+        '200':
+          description: Dashboard data retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolunteerDashboardResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - can only access own dashboard
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Volunteer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from login or refresh endpoint
+
+  schemas:
+    User:
+      type: object
+      required: ["id", "email", "name", "role", "isVerified", "createdAt"]
+      properties:
+        id:
+          type: string
+          pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          description: "Unique user identifier (UUID format)"
+        email:
+          type: string
+          format: email
+          description: "User's email address (used for authentication)"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: "User's full name"
+        role:
+          type: string
+          enum: ["VOLUNTEER", "ORG_ADMIN", "SUPERADMIN"]
+          description: "User's role determining access permissions"
+        isVerified:
+          type: boolean
+          description: "Whether the user's email has been verified"
+        createdAt:
+          type: string
+          format: date-time
+          description: "When the user account was created"
+        updatedAt:
+          type: string
+          format: date-time
+          description: "When the user account was last updated"
+        lastLoginAt:
+          type: string
+          format: date-time
+          description: "When the user last logged in"
+        profileImageUrl:
+          type: string
+          format: uri
+          description: "URL to user's profile image"
+      additionalProperties: false
+
+    AuthTokens:
+      type: object
+      required: ["accessToken", "refreshToken", "expiresIn", "tokenType"]
+      properties:
+        accessToken:
+          type: string
+          description: JWT access token for API authentication
+        refreshToken:
+          type: string
+          description: Refresh token for obtaining new access tokens
+        expiresIn:
+          type: integer
+          minimum: 1
+          description: Access token expiration time in seconds
+        tokenType:
+          type: string
+          enum: ["Bearer"]
+          description: Token type (always Bearer)
+      additionalProperties: false
+
+    MatchSuggestion:
+      type: object
+      required: [id, title, description, organizationName, requiredSkills, location, timeCommitment, matchScore]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        organizationName:
+          type: string
+        requiredSkills:
+          type: array
+          items:
+            type: string
+        location:
+          type: string
+        timeCommitment:
+          type: string
+        matchScore:
+          type: number
+          minimum: 0
+          maximum: 100
+
+    Application:
+      type: object
+      required: [id, volunteerId, opportunityId, status, appliedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        volunteerId:
+          type: string
+          format: uuid
+        opportunityId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, approved, rejected, withdrawn]
+        message:
+          type: string
+        appliedAt:
+          type: string
+          format: date-time
+        reviewedAt:
+          type: string
+          format: date-time
+        reviewerNotes:
+          type: string
+
+    VolunteerProfile:
+      type: object
+      required: [id, userId, name, email]
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        location:
+          type: string
+        skills:
+          type: array
+          items:
+            type: string
+        interests:
+          type: array
+          items:
+            type: string
+        availability:
+          type: object
+          properties:
+            weekdays:
+              type: boolean
+            weekends:
+              type: boolean
+            evenings:
+              type: boolean
+        profileImageUrl:
+          type: string
+          format: uri
+
+    VolunteerDashboardResponse:
+      type: object
+      required: [profile, activeApplications, recentMatches]
+      properties:
+        profile:
+          $ref: '#/components/schemas/VolunteerProfile'
+        activeApplications:
+          type: array
+          items:
+            $ref: '#/components/schemas/Application'
+        recentMatches:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatchSuggestion'
+
+    ErrorResponse:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          description: Error code
+        message:
+          type: string
+          description: Human-readable error description
+        details:
+          type: object
+          description: Additional error details
+      additionalProperties: false

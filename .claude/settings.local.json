@@ -41,7 +41,11 @@
       "Bash(timeout 5 curl -s http://localhost:8003/health)",
       "Bash(pytest:*)",
       "Bash(grep:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(quicktype:*)",
+      "Bash(datamodel-codegen:*)",
+      "Bash(mv:*)",
+      "Bash(dir C:UsersMohamadDocumentsClaudeseraaj-eventsourcedinfrastructure)"
     ],
     "deny": []
   }

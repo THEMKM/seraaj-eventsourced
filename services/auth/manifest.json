@@ -1,0 +1,33 @@
+{
+  "service": "auth",
+  "version": "1.0.0",
+  "contracts_version": "1.1.0",
+  "owns": {
+    "aggregates": ["User"],
+    "tables": ["users", "auth_events"],
+    "events_published": [
+      "user-registered",
+      "user-login",
+      "user-password-changed"
+    ],
+    "events_consumed": [],
+    "commands": [
+      "register-user",
+      "login-user",
+      "refresh-token",
+      "change-password"
+    ]
+  },
+  "api_endpoints": [
+    "POST /auth/register",
+    "POST /auth/login",
+    "POST /auth/refresh",
+    "GET /auth/me",
+    "GET /health"
+  ],
+  "jwt_config": {
+    "algorithm": "HS256",
+    "access_token_expire_minutes": 15,
+    "refresh_token_expire_days": 7
+  }
+}

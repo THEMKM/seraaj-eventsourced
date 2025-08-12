@@ -1,0 +1,291 @@
+openapi: 3.0.3
+info:
+  title: Seraaj Authentication API
+  description: Authentication and user management endpoints for the Seraaj platform
+  version: 1.1.0
+  contact:
+    name: Seraaj Team
+    url: https://seraaj.org
+servers:
+  - url: http://localhost:8000/api
+    description: Development server
+  - url: https://api.seraaj.org
+    description: Production server
+
+security:
+  - BearerAuth: []
+
+paths:
+  /auth/register:
+    post:
+      operationId: registerUser
+      summary: Register a new user account
+      description: Create a new user account with email and password
+      tags:
+        - Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ["email", "password", "name", "role"]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: User's email address
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 128
+                  description: User's password (minimum 8 characters)
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                  description: User's full name
+                role:
+                  type: string
+                  enum: ["VOLUNTEER", "ORG_ADMIN"]
+                  description: User's role (SUPERADMIN can only be created by existing superadmin)
+              additionalProperties: false
+            examples:
+              volunteer:
+                summary: Volunteer registration
+                value:
+                  email: "volunteer@example.com"
+                  password: "securepassword123"
+                  name: "John Doe"
+                  role: "VOLUNTEER"
+              orgAdmin:
+                summary: Organization admin registration
+                value:
+                  email: "admin@charity.org"
+                  password: "securepassword123"
+                  name: "Jane Smith"
+                  role: "ORG_ADMIN"
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: ["user", "tokens"]
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  tokens:
+                    $ref: '#/components/schemas/AuthTokens'
+                additionalProperties: false
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/login:
+    post:
+      operationId: loginUser
+      summary: Login with email and password
+      description: Authenticate user and return access tokens
+      tags:
+        - Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ["email", "password"]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: User's email address
+                password:
+                  type: string
+                  description: User's password
+              additionalProperties: false
+            example:
+              email: "user@example.com"
+              password: "securepassword123"
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                required: ["user", "tokens"]
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  tokens:
+                    $ref: '#/components/schemas/AuthTokens'
+                additionalProperties: false
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Account not verified or suspended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/refresh:
+    post:
+      operationId: refreshTokens
+      summary: Refresh access token
+      description: Exchange refresh token for new access and refresh tokens
+      tags:
+        - Authentication
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: ["refreshToken"]
+              properties:
+                refreshToken:
+                  type: string
+                  description: Valid refresh token
+              additionalProperties: false
+            example:
+              refreshToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      responses:
+        '200':
+          description: Tokens refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokens'
+        '401':
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      summary: Get current user profile
+      description: Retrieve the authenticated user's profile information
+      tags:
+        - Authentication
+      responses:
+        '200':
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from login or refresh endpoint
+
+  schemas:
+    User:
+      type: object
+      required: ["id", "email", "name", "role", "isVerified", "createdAt"]
+      properties:
+        id:
+          type: string
+          pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          description: "Unique user identifier (UUID format)"
+        email:
+          type: string
+          format: email
+          description: "User's email address (used for authentication)"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: "User's full name"
+        role:
+          type: string
+          enum: ["VOLUNTEER", "ORG_ADMIN", "SUPERADMIN"]
+          description: "User's role determining access permissions"
+        isVerified:
+          type: boolean
+          description: "Whether the user's email has been verified"
+        createdAt:
+          type: string
+          format: date-time
+          description: "When the user account was created"
+        updatedAt:
+          type: string
+          format: date-time
+          description: "When the user account was last updated"
+        lastLoginAt:
+          type: string
+          format: date-time
+          description: "When the user last logged in"
+        profileImageUrl:
+          type: string
+          format: uri
+          description: "URL to user's profile image"
+      additionalProperties: false
+
+    AuthTokens:
+      type: object
+      required: ["accessToken", "refreshToken", "expiresIn", "tokenType"]
+      properties:
+        accessToken:
+          type: string
+          description: JWT access token for API authentication
+        refreshToken:
+          type: string
+          description: Refresh token for obtaining new access tokens
+        expiresIn:
+          type: integer
+          minimum: 1
+          description: Access token expiration time in seconds
+        tokenType:
+          type: string
+          enum: ["Bearer"]
+          description: Token type (always Bearer)
+      additionalProperties: false
+
+    Error:
+      type: object
+      required: ["error", "message"]
+      properties:
+        error:
+          type: string
+          description: Error code
+        message:
+          type: string
+          description: Human-readable error description
+        details:
+          type: object
+          description: Additional error details
+      additionalProperties: false

@@ -1,0 +1,25 @@
+{
+  "timestamp": "2025-08-11T07:37:00Z",
+  "agent": "GENERATOR",
+  "operation": "auth_artifacts_generation",
+  "contracts_version": "v1.1.0",
+  "tool_versions": {
+    "datamodelCodegen": "0.25.0",
+    "quicktype": "23.2.6"
+  },
+  "commands_executed": [
+    "Manual generation of TypeScript types from contracts/v1.1.0/entities/user.schema.json",
+    "Manual generation of Python models from contracts/v1.1.0/entities/user.schema.json",
+    "Manual generation of BFF auth client from contracts/v1.1.0/api/auth.openapi.yaml"
+  ],
+  "inputs": [
+    "contracts/v1.1.0/entities/user.schema.json",
+    "contracts/v1.1.0/api/auth.openapi.yaml"
+  ],
+  "outputs": [
+    "frontend/src/types/v1_1/entities.ts",
+    "services/shared/auth_models.py",
+    "bff/auth_client.py",
+    "packages/sdk-bff/.codegen_versions.json"
+  ]
+}
