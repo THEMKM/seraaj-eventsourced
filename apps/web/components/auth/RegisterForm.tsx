@@ -80,8 +80,12 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
     <PxCard variant="default" className="w-full max-w-md mx-auto">
       <div className="space-y-6">
         <div className="text-center">
-          <h2 className="text-xl font-pixel text-sunBurst mb-2">REGISTER</h2>
-          <p className="text-sm text-white">Join the Seraaj community</p>
+          <h2 className="text-xl font-pixel text-primary dark:text-neon-cyan mb-2">
+            🎆 CREATE HERO 🎆
+          </h2>
+          <p className="text-sm text-ink dark:text-white">
+            Begin your epic volunteering adventure!
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -109,8 +113,8 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
             value={formData.role}
             onChange={(e) => updateFormData('role', e.target.value)}
             options={[
-              { value: UserRole.VOLUNTEER, label: 'Find volunteer opportunities' },
-              { value: UserRole.ORG_ADMIN, label: 'Manage an organization' }
+              { value: UserRole.VOLUNTEER, label: '🎆 Become a Hero (Volunteer)' },
+              { value: UserRole.ORG_ADMIN, label: '🏰 Create a Guild (Organization)' }
             ]}
           />
 
@@ -135,8 +139,8 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
           />
 
           {errors.general && (
-            <div className="p-3 border-2 border-error bg-error/10 rounded">
-              <p className="text-xs text-error font-pixel">{errors.general}</p>
+            <div className="clip-px border-px border-error bg-error/10 p-3">
+              <p className="text-xs text-error font-pixel">❌ {errors.general}</p>
             </div>
           )}
 
@@ -147,18 +151,20 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
             className="w-full"
             disabled={isLoading}
           >
-            {isLoading ? 'CREATING ACCOUNT...' : 'CREATE ACCOUNT'}
+            {isLoading ? '⏳ SPAWNING HERO...' : '✨ CREATE HERO'}
           </PxButton>
         </form>
 
         <div className="text-center">
-          <p className="text-xs text-white mb-2">Already have an account?</p>
+          <p className="text-xs text-ink dark:text-white mb-2">
+            🔑 Already a hero? Continue your quest!
+          </p>
           <PxButton
             variant="secondary"
             size="sm"
             onClick={onSwitchToLogin}
           >
-            LOGIN
+            🚀 LOGIN
           </PxButton>
         </div>
       </div>

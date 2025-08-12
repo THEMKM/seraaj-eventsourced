@@ -25,7 +25,7 @@ class CodeGenerator:
     def generate_python_models(self):
         """Generate Pydantic models from JSON schemas"""
         print("Generating Python models...")
-        entities_dir = self.contracts_dir / "entities"
+        entities_dir = self.active_contracts_dir / "entities"
         if entities_dir.exists() and list(entities_dir.glob("*.json")):
             subprocess.run([
                 "datamodel-codegen",
@@ -41,7 +41,7 @@ class CodeGenerator:
                 "--use-non-positive-negative-number-constrained-types"
             ], check=True)
         else:
-            print("    WARNING: No entities found in v1.0.0, skipping")
+            print("    WARNING: No entities found in active contracts dir, skipping")
         
     def generate_typescript_types(self):
         """Generate TypeScript interfaces from JSON schemas"""
@@ -51,7 +51,7 @@ class CodeGenerator:
         
         subprocess.run([
             "quicktype",
-            str(self.contracts_dir / "entities"),
+            str(self.active_contracts_dir / "entities"),
             "-o", str(self.frontend_dir / "src" / "types" / "entities.ts"),
             "--lang", "typescript",
             "--just-types",
@@ -62,7 +62,7 @@ class CodeGenerator:
     def generate_api_clients(self):
         """Generate API clients from OpenAPI specs"""
         print("Generating API clients...")
-        api_dir = self.contracts_dir / "api"
+        api_dir = self.active_contracts_dir / "api"
         if api_dir.exists():
             for api_spec in api_dir.glob("*.yaml"):
                 service_name = api_spec.stem
@@ -80,7 +80,7 @@ class CodeGenerator:
     def generate_state_machines(self):
         """Generate state machine code from workflow definitions"""
         print("Generating state machines...")
-        workflows_dir = self.contracts_dir / "workflows"
+        workflows_dir = self.active_contracts_dir / "workflows"
         if workflows_dir.exists():
             for workflow_file in workflows_dir.glob("*.json"):
                 with open(workflow_file) as f:
@@ -210,21 +210,12 @@ class {class_name}StateMachine:
     def calculate_checksum(self):
         """Calculate and store checksum of contracts"""
         hasher = hashlib.sha256()
-        for file_path in sorted(self.contracts_dir.rglob("*.json")):
+        for file_path in sorted(self.active_contracts_dir.rglob("*.json")):
             hasher.update(file_path.read_bytes())
-        for file_path in sorted(self.contracts_dir.rglob("*.yaml")):
+        for file_path in sorted(self.active_contracts_dir.rglob("*.yaml")):
             hasher.update(file_path.read_bytes())
             
         checksum = hasher.hexdigest()
-        
-        # Update version lock with checksum
-        version_lock_path = Path("contracts/version.lock")
-        with open(version_lock_path) as f:
-            lock_data = json.load(f)
-        lock_data["checksum"] = checksum
-        lock_data["last_generated"] = datetime.utcnow().isoformat()
-        with open(version_lock_path, "w") as f:
-            json.dump(lock_data, f, indent=2)
             
         return checksum
         
@@ -242,15 +233,15 @@ class {class_name}StateMachine:
                 "quicktype": "latest"
             },
             "commands_executed": [
-                "datamodel-codegen --input contracts/v1.0.0/entities --output services/shared/models.py",
-                "quicktype contracts/v1.0.0/entities -o frontend/src/types/entities.ts",
-                "npx @redocly/cli@1.16.0 bundle contracts/v1.0.0/api/bff.openapi.yaml",
+                "datamodel-codegen --input contracts/v1.1.0/entities --output services/shared/models.py",
+                "quicktype contracts/v1.1.0/entities -o frontend/src/types/entities.ts",
+                "npx @redocly/cli@1.16.0 bundle contracts/v1.1.0/api/bff.openapi.yaml",
                 "npx @openapitools/openapi-generator-cli@2.13.4 generate -g typescript-fetch"
             ],
             "inputs": [
-                "contracts/v1.0.0/entities/",
-                "contracts/v1.0.0/api/bff.openapi.yaml",
-                "contracts/v1.0.0/workflows/"
+                "contracts/v1.1.0/entities/",
+                "contracts/v1.1.0/api/bff.openapi.yaml",
+                "contracts/v1.1.0/workflows/"
             ],
             "outputs": [
                 "services/shared/models.py",

@@ -7,7 +7,12 @@ from typing import Optional, AsyncGenerator
 from contextlib import asynccontextmanager
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import QueuePool
-import asyncpg
+try:
+    import asyncpg  # type: ignore
+    ASYNCPG_AVAILABLE = True
+except Exception:
+    asyncpg = None  # type: ignore
+    ASYNCPG_AVAILABLE = False
 import logging
 
 logger = logging.getLogger(__name__)
@@ -180,7 +185,7 @@ class ConnectionRetry:
         for attempt in range(self.max_retries + 1):
             try:
                 return await func(*args, **kwargs)
-            except (asyncpg.PostgresError, ConnectionError) as e:
+            except self._db_errors() as e:
                 last_exception = e
                 if attempt < self.max_retries:
                     logger.warning(f"Database operation failed (attempt {attempt + 1}/{self.max_retries + 1}): {e}")
@@ -189,6 +194,16 @@ class ConnectionRetry:
                     logger.error(f"Database operation failed after {self.max_retries + 1} attempts: {e}")
         
         raise last_exception
+
+    @staticmethod
+    def _db_errors():
+        """Return a tuple of database-related exceptions to catch.
+
+        If asyncpg is not installed, only ConnectionError is returned.
+        """
+        if ASYNCPG_AVAILABLE and hasattr(asyncpg, "PostgresError"):
+            return (asyncpg.PostgresError, ConnectionError)  # type: ignore[attr-defined]
+        return (ConnectionError,)
 
 # Default retry instance
 default_retry = ConnectionRetry()

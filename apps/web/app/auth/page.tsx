@@ -34,10 +34,10 @@ function AuthPageContent() {
     return (
       <main className="min-h-screen bg-gradient-to-br from-deepIndigo to-ink flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="text-2xl font-pixel text-sunBurst animate-pxGlow mb-4">
-            SERAAJ
+          <div className="text-3xl font-pixel text-primary animate-px-glow mb-2">
+            🎆 SERAAJ 🎆
           </div>
-          <div className="text-sm text-white font-pixel">LOADING...</div>
+          <div className="text-sm text-white font-pixel">⏳ LOADING QUEST...</div>
         </div>
       </main>
     );
@@ -51,11 +51,14 @@ function AuthPageContent() {
     <main className="min-h-screen bg-gradient-to-br from-deepIndigo to-ink flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-pixel text-sunBurst mb-2 animate-pxGlow">
-            SERAAJ
+          <h1 className="text-4xl font-pixel text-primary dark:text-neon-cyan mb-2 animate-px-glow">
+            🎆 SERAAJ 🎆
           </h1>
+          <div className="text-lg font-pixel text-pixel-coral dark:text-neon-pink mb-2">
+            8-BIT HERO LOGIN
+          </div>
           <p className="text-sm text-white">
-            Connect volunteers with meaningful opportunities
+            🚀 Join the quest to change the world!
           </p>
         </div>
 
@@ -80,10 +83,10 @@ export default function AuthPage() {
     <Suspense fallback={
       <main className="min-h-screen bg-gradient-to-br from-deepIndigo to-ink flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="text-2xl font-pixel text-sunBurst animate-pxGlow mb-4">
-            SERAAJ
+          <div className="text-3xl font-pixel text-primary animate-px-glow mb-2">
+            🎆 SERAAJ 🎆
           </div>
-          <div className="text-sm text-white font-pixel">LOADING...</div>
+          <div className="text-sm text-white font-pixel">⏳ LOADING QUEST...</div>
         </div>
       </main>
     }>

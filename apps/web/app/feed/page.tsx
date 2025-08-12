@@ -19,82 +19,97 @@ export default function FeedPage() {
     <main className="min-h-screen bg-gradient-to-br from-deepIndigo to-ink p-4">
       <div className="max-w-4xl mx-auto py-8">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-pixel text-sunBurst mb-4">
-            VOLUNTEER FEED
+          <h1 className="text-4xl font-pixel text-primary dark:text-neon-cyan mb-2">
+            🎆 QUEST BOARD 🎆
           </h1>
+          <div className="text-xl font-pixel text-pixel-coral dark:text-neon-pink mb-4">
+            AVAILABLE ADVENTURES
+          </div>
           <p className="text-white mb-6">
-            Discover opportunities that match your interests
+            🚀 Choose your next epic volunteer quest!
           </p>
           <PxButton variant="success" onClick={handleQuickMatch}>
-            Quick Match
+            ✨ QUEST MATCH
           </PxButton>
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
-          <PxCard variant="default">
-            <h3 className="text-lg font-pixel text-sunBurst mb-2">
-              Community Garden Cleanup
-            </h3>
-            <p className="text-sm text-white mb-3">
-              Help maintain the local community garden this weekend.
+          <PxCard variant="default" className="hover:scale-105 transition-transform duration-300">
+            <div className="flex items-center mb-2">
+              <span className="text-2xl mr-2">🌱</span>
+              <h3 className="text-lg font-pixel text-primary mb-0">
+                GARDEN QUEST
+              </h3>
+            </div>
+            <p className="text-sm text-ink dark:text-white mb-3">
+              🌿 Battle the weeds and restore nature's harmony this weekend!
             </p>
             <div className="flex gap-2">
               <PxButton variant="secondary" size="sm">
-                Learn More
+                🔍 DETAILS
               </PxButton>
               <PxButton variant="success" size="sm">
-                Apply
+                🚀 JOIN QUEST
               </PxButton>
             </div>
           </PxCard>
 
-          <PxCard variant="glow">
-            <h3 className="text-lg font-pixel text-sunBurst mb-2">
-              Food Bank Support
-            </h3>
+          <PxCard variant="glow" className="hover:scale-105 transition-transform duration-300">
+            <div className="flex items-center mb-2">
+              <span className="text-2xl mr-2">🍞</span>
+              <h3 className="text-lg font-pixel text-sunBurst mb-0">
+                HUNGER FIGHTER
+              </h3>
+            </div>
             <p className="text-sm text-white mb-3">
-              Sort and distribute food donations to families in need.
+              ⚔️ Defeat hunger by distributing magical food supplies to families!
             </p>
             <div className="flex gap-2">
               <PxButton variant="secondary" size="sm">
-                Learn More
+                🔍 DETAILS
               </PxButton>
               <PxButton variant="success" size="sm">
-                Apply
+                🚀 JOIN QUEST
               </PxButton>
             </div>
           </PxCard>
 
-          <PxCard variant="default">
-            <h3 className="text-lg font-pixel text-sunBurst mb-2">
-              Youth Mentoring
-            </h3>
-            <p className="text-sm text-white mb-3">
-              Guide and support young people in their educational journey.
+          <PxCard variant="default" className="hover:scale-105 transition-transform duration-300">
+            <div className="flex items-center mb-2">
+              <span className="text-2xl mr-2">🎓</span>
+              <h3 className="text-lg font-pixel text-primary mb-0">
+                WISDOM KEEPER
+              </h3>
+            </div>
+            <p className="text-sm text-ink dark:text-white mb-3">
+              🧙 Share your knowledge magic with young adventurers!
             </p>
             <div className="flex gap-2">
               <PxButton variant="secondary" size="sm">
-                Learn More
+                🔍 DETAILS
               </PxButton>
               <PxButton variant="success" size="sm">
-                Apply
+                🚀 JOIN QUEST
               </PxButton>
             </div>
           </PxCard>
 
-          <PxCard variant="default">
-            <h3 className="text-lg font-pixel text-sunBurst mb-2">
-              Senior Care Visits
-            </h3>
-            <p className="text-sm text-white mb-3">
-              Spend time with elderly residents at local care facilities.
+          <PxCard variant="default" className="hover:scale-105 transition-transform duration-300">
+            <div className="flex items-center mb-2">
+              <span className="text-2xl mr-2">👩‍💼</span>
+              <h3 className="text-lg font-pixel text-primary mb-0">
+                ELDER GUARDIAN
+              </h3>
+            </div>
+            <p className="text-sm text-ink dark:text-white mb-3">
+              💖 Share stories and companionship with wise elders!
             </p>
             <div className="flex gap-2">
               <PxButton variant="secondary" size="sm">
-                Learn More
+                🔍 DETAILS
               </PxButton>
               <PxButton variant="success" size="sm">
-                Apply
+                🚀 JOIN QUEST
               </PxButton>
             </div>
           </PxCard>

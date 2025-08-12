@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
-    "validate:schemas": "ajv compile -s 'contracts/**/*.json' --strict=true",
+  "validate:schemas": "ajv compile -s 'contracts/v1.1.0/**/*.json' --strict=true",
+  "validate:openapi": "npx @redocly/cli@1.16.0 lint contracts/v1.1.0/api/bff.openapi.yaml",
     "generate": "make generate",
     "test:contracts": "jest tests/contracts",
     "checkpoint": "make checkpoint",
@@ -19,8 +20,7 @@
   },
   "devDependencies": {
     "ajv-cli": "^5.0.0",
-    "@openapitools/openapi-generator-cli": "2.7.0",
-    "openapi-generator-cli": "1.0.0",
+  "@openapitools/openapi-generator-cli": "2.7.0",
     "quicktype": "^23.0.0",
     "@redocly/cli": "1.16.0",
     "typescript": "^5.5.0",

@@ -18,9 +18,12 @@ class DriftValidator:
         if lock_file.exists():
             lock = json.loads(lock_file.read_text())
             if lock.get("frozen"):
-                current_hash = self._hash_directory(Path("contracts/v1.0.0"))
-                if current_hash != lock.get("checksum"):
-                    self.errors.append("CRITICAL: Frozen contracts have been modified!")
+                current_hash = self._hash_directory(Path("contracts/v1.1.0"))
+                expected = lock.get("checksum")
+                if current_hash != expected:
+                    self.errors.append(
+                        f"CRITICAL: Frozen contracts (v1.1.0) have been modified! Expected {expected[:12]}..., got {current_hash[:12]}..."
+                    )
                     
     def validate_service_boundaries(self):
         """Ensure services don't import from each other"""

@@ -73,7 +73,8 @@
       "Bash(pnpm --filter @seraaj/web install)",
       "Bash(pnpm --filter @seraaj/web test)",
       "Bash(pnpm lint:*)",
-      "Bash(NEXT_PUBLIC_BFF_URL=http://localhost:8000/api timeout 15 pnpm dev)"
+      "Bash(NEXT_PUBLIC_BFF_URL=http://localhost:8000/api timeout 15 pnpm dev)",
+      "Bash(find:*)"
     ],
     "deny": []
   }

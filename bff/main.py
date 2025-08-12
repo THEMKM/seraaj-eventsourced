@@ -37,7 +37,7 @@ from services.shared.logging_config import (
 def load_openapi_schema():
     """Load the OpenAPI schema and referenced schemas for validation"""
     try:
-        schema_path = Path(__file__).parent.parent / "contracts" / "v1.0.0" / "api" / "bff.openapi.yaml"
+        schema_path = Path(__file__).parent.parent / "contracts" / "v1.1.0" / "api" / "bff.openapi.yaml"
         schemas_dir = schema_path.parent / "schemas"
         
         with open(schema_path, 'r', encoding='utf-8') as f:
@@ -137,7 +137,7 @@ def validate_response_schema(endpoint_path: str, method: str, status_code: int, 
 app = FastAPI(
     title="Seraaj BFF API",
     description="Backend for Frontend API for the Seraaj volunteer platform",
-    version="1.0.0"
+        version="1.1.0"
 )
 
 # Setup structured logging
@@ -262,56 +262,11 @@ async def health_check():
     response_data = {
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
-        "version": "1.0.0"
+    "version": "1.1.0"
     }
     
     # Validate against schema
     validate_response_schema("/health", "get", 200, response_data)
-    
-    return response_data
-
-
-@app.get("/api/health/services")
-async def aggregated_health():
-    """Aggregate health from all dependent services"""
-    services = {
-        "applications": "http://127.0.0.1:8001/health",
-        "matching": "http://127.0.0.1:8003/health",
-        "auth": "http://127.0.0.1:8004/health"
-    }
-    
-    results = {}
-    overall_healthy = True
-    
-    async with httpx.AsyncClient(timeout=5.0) as client:
-        for service_name, url in services.items():
-            try:
-                start_time = datetime.utcnow()
-                response = await client.get(url)
-                duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
-                
-                results[service_name] = {
-                    "status": "healthy" if response.status_code == 200 else "unhealthy",
-                    "statusCode": response.status_code,
-                    "responseTimeMs": duration_ms
-                }
-                
-                if response.status_code != 200:
-                    overall_healthy = False
-                    
-            except Exception as e:
-                results[service_name] = {
-                    "status": "unreachable", 
-                    "error": str(e)
-                }
-                overall_healthy = False
-    
-    response_data = {
-        "status": "healthy" if overall_healthy else "degraded",
-        "timestamp": datetime.utcnow().isoformat(),
-        "version": "1.0.0",
-        "services": results
-    }
     
     return response_data
 
@@ -328,7 +283,7 @@ async def services_health_check():
     response_data = {
         "status": overall_status,
         "timestamp": datetime.utcnow().isoformat(),
-        "version": "1.0.0",
+        "version": "1.1.0",
         "services": {
             "applications": "healthy" if applications_healthy else "unhealthy",
             "matching": "healthy" if matching_healthy else "unhealthy",

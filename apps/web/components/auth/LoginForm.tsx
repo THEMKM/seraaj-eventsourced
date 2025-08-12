@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { PxButton, PxCard } from '@seraaj/ui';
 import { PxInput } from '@/components/forms/PxInput';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/contexts/ToastContext';
 
 export interface LoginFormProps {
   onSuccess?: () => void;
@@ -12,6 +13,7 @@ export interface LoginFormProps {
 
 export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
   const { login, isLoading } = useAuth();
+  const { showSuccess, showError } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -27,10 +29,13 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
 
     try {
       await login(email, password);
+      showSuccess('🎆 Welcome back, hero! Ready for your next quest?');
       onSuccess?.();
     } catch (err) {
       console.error('Login failed:', err);
-      setError(err instanceof Error ? err.message : 'Login failed');
+      const errorMessage = err instanceof Error ? err.message : 'Login failed';
+      setError(errorMessage);
+      showError(`Login failed: ${errorMessage}`);
     }
   };
 
@@ -38,8 +43,12 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
     <PxCard variant="default" className="w-full max-w-md mx-auto">
       <div className="space-y-6">
         <div className="text-center">
-          <h2 className="text-xl font-pixel text-sunBurst mb-2">LOGIN</h2>
-          <p className="text-sm text-white">Welcome back to Seraaj</p>
+          <h2 className="text-xl font-pixel text-primary dark:text-neon-cyan mb-2">
+            🔑 HERO LOGIN 🔑
+          </h2>
+          <p className="text-sm text-ink dark:text-white">
+            Ready to continue your quest?
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -62,8 +71,8 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
           />
 
           {error && (
-            <div className="p-3 border-2 border-error bg-error/10 rounded">
-              <p className="text-xs text-error font-pixel">{error}</p>
+            <div className="clip-px border-px border-error bg-error/10 p-3">
+              <p className="text-xs text-error font-pixel">❌ {error}</p>
             </div>
           )}
 
@@ -74,18 +83,20 @@ export function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
             className="w-full"
             disabled={isLoading}
           >
-            {isLoading ? 'LOGGING IN...' : 'LOGIN'}
+            {isLoading ? '⏳ LOGGING IN...' : '🚀 START QUEST'}
           </PxButton>
         </form>
 
         <div className="text-center">
-          <p className="text-xs text-white mb-2">Don&apos;t have an account?</p>
+          <p className="text-xs text-ink dark:text-white mb-2">
+            🎆 New hero? Join the guild!
+          </p>
           <PxButton
             variant="secondary"
             size="sm"
             onClick={onSwitchToRegister}
           >
-            REGISTER
+            ✨ REGISTER
           </PxButton>
         </div>
       </div>

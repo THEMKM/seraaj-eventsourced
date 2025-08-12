@@ -23,7 +23,7 @@ export const PxInput = forwardRef<HTMLInputElement, PxInputProps>(function PxInp
   return (
     <div className="space-y-1">
       {label && (
-        <label htmlFor={inputId} className="block text-xs font-pixel text-sunBurst">
+        <label htmlFor={inputId} className="block text-sm font-pixel text-ink dark:text-white">
           {label}
         </label>
       )}
@@ -31,25 +31,26 @@ export const PxInput = forwardRef<HTMLInputElement, PxInputProps>(function PxInp
         ref={ref}
         id={inputId}
         className={clsx(
-          'w-full border-2 bg-deepIndigo text-white font-pixel text-xs',
-          'focus:outline-none focus:ring-2 focus:ring-offset-2',
-          'transition-all duration-200',
+          'w-full clip-px border-px bg-white border-ink font-body',
+          'focus:outline-none focus:ring-2 focus:ring-pixel-coral focus:ring-dotted',
+          'placeholder:text-gray-500 transition-all duration-200',
+          'dark:bg-dark-surface dark:border-dark-border dark:text-white dark:placeholder:text-gray-400',
           {
             // Variants
-            'border-electricTeal focus:ring-electricTeal': variant === 'default' && !hasError,
-            'border-error focus:ring-error': hasError,
+            'text-ink dark:text-white': variant === 'default' && !hasError,
+            'border-pixel-coral dark:border-pixel-coral': hasError,
             
             // Sizes
-            'px-2 py-1 text-xs': size === 'sm',
-            'px-3 py-2 text-sm': size === 'md',
-            'px-4 py-3 text-base': size === 'lg',
+            'px-2 py-1 text-sm': size === 'sm',
+            'px-px-2 py-2 text-sm': size === 'md',
+            'px-px-3 py-3 text-base': size === 'lg',
           },
           className
         )}
         {...props}
       />
       {error && (
-        <p className="text-xs text-error font-pixel">
+        <p className="text-sm font-body text-pixel-coral">
           {error}
         </p>
       )}

@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { ToastProvider } from '@/contexts/ToastContext';
+import { OpportunitiesProvider } from '@/contexts/OpportunitiesContext';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
@@ -19,7 +21,11 @@ export default function RootLayout({
     <html lang="en" dir="ltr">
       <body className={`${inter.variable} font-body`}>
         <AuthProvider>
-          {children}
+          <ToastProvider>
+            <OpportunitiesProvider>
+              {children}
+            </OpportunitiesProvider>
+          </ToastProvider>
         </AuthProvider>
       </body>
     </html>

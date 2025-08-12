@@ -44,7 +44,8 @@ class AuthService:
             'role': user.role.value if hasattr(user.role, 'value') else user.role,
             'exp': now + self.access_token_expire,
             'iat': now,
-            'type': 'access'
+            'type': 'access',
+            'jti': str(uuid4())
         }
         
         # Refresh token payload
@@ -52,7 +53,8 @@ class AuthService:
             'user_id': user.id,
             'exp': now + self.refresh_token_expire,
             'iat': now,
-            'type': 'refresh'
+            'type': 'refresh',
+            'jti': str(uuid4())
         }
         
         access_token = jwt.encode(access_payload, self.jwt_secret, algorithm=self.jwt_algorithm)

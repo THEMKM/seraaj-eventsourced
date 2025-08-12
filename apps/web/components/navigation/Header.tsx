@@ -8,13 +8,13 @@ export function Header() {
   const { isAuthenticated, user, logout, isLoading } = useAuth();
 
   return (
-    <header className="bg-deepIndigo border-b-2 border-electricTeal">
+    <header className="bg-deep-indigo clip-px border-px border-electric-teal shadow-px">
       <div className="max-w-6xl mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
-            <h1 className="text-xl font-pixel text-sunBurst hover:animate-pxGlow">
-              SERAAJ
+            <h1 className="text-xl font-pixel text-primary dark:text-neon-cyan hover:animate-px-glow">
+              🎆 SERAAJ 🎆
             </h1>
           </Link>
 
@@ -24,21 +24,27 @@ export function Header() {
               <>
                 <Link 
                   href="/dashboard" 
-                  className="text-sm text-white hover:text-sunBurst font-pixel"
+                  className="text-sm text-white hover:text-primary font-pixel transition-colors duration-200"
                 >
-                  DASHBOARD
+                  🏆 DASHBOARD
                 </Link>
                 <Link 
                   href="/opportunities" 
-                  className="text-sm text-white hover:text-sunBurst font-pixel"
+                  className="text-sm text-white hover:text-primary font-pixel transition-colors duration-200"
                 >
-                  OPPORTUNITIES
+                  🎯 OPPORTUNITIES
                 </Link>
                 <Link 
-                  href="/matches" 
-                  className="text-sm text-white hover:text-sunBurst font-pixel"
+                  href="/feed" 
+                  className="text-sm text-white hover:text-primary font-pixel transition-colors duration-200"
                 >
-                  MATCHES
+                  🎆 QUESTS
+                </Link>
+                <Link 
+                  href="/profile" 
+                  className="text-sm text-white hover:text-primary font-pixel transition-colors duration-200"
+                >
+                  👤 PROFILE
                 </Link>
               </>
             )}
@@ -47,30 +53,30 @@ export function Header() {
           {/* Auth Section */}
           <div className="flex items-center space-x-4">
             {isLoading ? (
-              <div className="text-xs text-white font-pixel">LOADING...</div>
+              <div className="text-xs text-white font-pixel">⏳ LOADING...</div>
             ) : isAuthenticated && user ? (
               <div className="flex items-center space-x-4">
-                <span className="text-xs text-white font-pixel">
-                  Hello, {user.name}
+                <span className="text-xs text-primary font-pixel">
+                  🎉 {user.name?.toUpperCase()}
                 </span>
                 <PxButton
                   variant="secondary"
                   size="sm"
                   onClick={logout}
                 >
-                  LOGOUT
+                  🚪 LOGOUT
                 </PxButton>
               </div>
             ) : (
               <div className="flex items-center space-x-2">
                 <Link href="/auth?mode=login">
                   <PxButton variant="secondary" size="sm">
-                    LOGIN
+                    🔑 LOGIN
                   </PxButton>
                 </Link>
                 <Link href="/auth?mode=register">
                   <PxButton variant="primary" size="sm">
-                    REGISTER
+                    ✨ JOIN
                   </PxButton>
                 </Link>
               </div>

@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Optional
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Header, status, Request
+from fastapi import FastAPI, HTTPException, Header, status, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 from services.shared.auth_models import (
@@ -113,7 +113,7 @@ async def readiness_check():
              400: {"model": ApiError, "description": "Invalid request data"},
              409: {"model": ApiError, "description": "Email already registered"}
          })
-async def register_user(request: RegisterUserRequest, req: Request):
+async def register_user(request: RegisterUserRequest, req: Request, service: AuthService = Depends(get_auth_service)):
     """Register a new user account"""
     trace_id = get_trace_id(req)
     start_time = datetime.utcnow()
@@ -127,7 +127,6 @@ async def register_user(request: RegisterUserRequest, req: Request):
     )
     
     try:
-        service = get_auth_service()
         result = await service.register_user(
             email=request.email,
             password=request.password,
@@ -206,7 +205,7 @@ async def register_user(request: RegisterUserRequest, req: Request):
              401: {"model": ApiError, "description": "Invalid credentials"},
              403: {"model": ApiError, "description": "Account not verified or suspended"}
          })
-async def login_user(request: LoginUserRequest, req: Request):
+async def login_user(request: LoginUserRequest, req: Request, service: AuthService = Depends(get_auth_service)):
     """Login with email and password"""
     trace_id = get_trace_id(req)
     start_time = datetime.utcnow()
@@ -219,7 +218,6 @@ async def login_user(request: LoginUserRequest, req: Request):
     )
     
     try:
-        service = get_auth_service()
         result = await service.login_user(
             email=request.email,
             password=request.password
@@ -295,7 +293,7 @@ async def login_user(request: LoginUserRequest, req: Request):
          responses={
              401: {"model": ApiError, "description": "Invalid or expired refresh token"}
          })
-async def refresh_tokens(request: RefreshTokenRequest, req: Request):
+async def refresh_tokens(request: RefreshTokenRequest, req: Request, service: AuthService = Depends(get_auth_service)):
     """Exchange refresh token for new access and refresh tokens"""
     trace_id = get_trace_id(req)
     
@@ -306,7 +304,6 @@ async def refresh_tokens(request: RefreshTokenRequest, req: Request):
     )
     
     try:
-        service = get_auth_service()
         tokens = await service.refresh_tokens(request.refreshToken)
         
         log_structured(
@@ -354,7 +351,8 @@ async def refresh_tokens(request: RefreshTokenRequest, req: Request):
         })
 async def get_current_user(
     req: Request,
-    authorization: Optional[str] = Header(None)
+    authorization: Optional[str] = Header(None),
+    service: AuthService = Depends(get_auth_service)
 ):
     """Retrieve the authenticated user's profile information"""
     trace_id = get_trace_id(req)
@@ -390,7 +388,6 @@ async def get_current_user(
     access_token = authorization[7:]  # Remove "Bearer " prefix
     
     try:
-        service = get_auth_service()
         user = await service.get_current_user(access_token)
         
         log_structured(
