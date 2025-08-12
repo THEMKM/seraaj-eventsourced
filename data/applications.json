@@ -70,5 +70,17 @@
     "reviewedAt": null,
     "createdAt": "2025-08-09T15:29:51.567851",
     "updatedAt": "2025-08-09T15:29:51.567851"
+  },
+  {
+    "id": "9a76aae3-45e4-43f9-a194-e61e054f1fbf",
+    "volunteerId": "4f826c71-b3be-477c-a27b-7276ea811603",
+    "opportunityId": "opp6",
+    "organizationId": null,
+    "status": "submitted",
+    "coverLetter": "This is a smoke test application submission.",
+    "submittedAt": "2025-08-11T23:52:18.483384",
+    "reviewedAt": null,
+    "createdAt": "2025-08-11T23:52:18.483384",
+    "updatedAt": "2025-08-11T23:52:18.483384"
   }
 ]

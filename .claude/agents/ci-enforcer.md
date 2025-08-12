@@ -204,9 +204,9 @@ jobs:
         
     - name: Start Matching Service  
       run: |
-        uvicorn services.matching.api:app --host 127.0.0.1 --port 8002 &
+        uvicorn services.matching.api:app --host 127.0.0.1 --port 8003 &
         sleep 5
-        curl --retry 5 --retry-connrefused http://127.0.0.1:8002/health
+        curl --retry 5 --retry-connrefused http://127.0.0.1:8003/health
       env:
         REDIS_URL: redis://localhost:6379
         
@@ -544,7 +544,7 @@ NEXT_PUBLIC_BFF_URL=http://127.0.0.1:8000/api
 **Service Startup Order in CI**:
 1. PostgreSQL & Redis (via services)
 2. Applications Service (port 8001)
-3. Matching Service (port 8002) 
+3. Matching Service (port 8003) 
 4. Auth Service (port 8003, if exists)
 5. BFF Service (port 8000)
 6. Run E2E tests against all services

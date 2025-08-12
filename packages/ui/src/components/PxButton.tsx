@@ -1,7 +1,7 @@
 import React from 'react';
 import { clsx } from 'clsx';
 
-export interface PxButtonProps {
+export interface PxButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'size'> {
   variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'error';
   size?: 'sm' | 'md' | 'lg';
   children: React.ReactNode;
@@ -16,12 +16,14 @@ export function PxButton({
   children,
   onClick,
   disabled = false,
-  className
+  className,
+  ...props
 }: PxButtonProps) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
+      {...props}
       className={clsx(
         'px-4 py-2 font-pixel text-xs border-2 transition-all duration-200',
         'focus:outline-none focus:ring-2 focus:ring-offset-2',

@@ -14,6 +14,8 @@ class CodeGenerator:
         self.services_dir = Path("services")
         self.frontend_dir = Path("frontend")
         self.checkpoints_dir = Path(".agents/checkpoints")
+        # Use v1.1.0 as the active version
+        self.active_contracts_dir = self.contracts_v11_dir
         
     def verify_contracts_complete(self):
         """Ensure contracts are ready for generation"""
@@ -92,7 +94,7 @@ class CodeGenerator:
         tmp = Path('.tmp')
         tmp.mkdir(exist_ok=True)
         
-        bff_src = self.contracts_dir / 'api' / 'bff.openapi.yaml'
+        bff_src = self.active_contracts_dir / 'api' / 'bff.openapi.yaml'
         if not bff_src.exists():
             print("WARNING: BFF OpenAPI spec not found, skipping")
             return

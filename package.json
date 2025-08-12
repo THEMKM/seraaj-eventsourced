@@ -12,7 +12,9 @@
     "build:web": "pnpm --filter @seraaj/web build",
     "lint": "pnpm -r lint",
     "type-check": "pnpm -r type-check",
-    "build": "pnpm -r build"
+    "build": "pnpm -r build",
+    "check:all": "pnpm run type-check && pnpm run lint && pnpm run build && python tools/validators/validate.py && pytest -q",
+    "smoke": "powershell -ExecutionPolicy Bypass -File tools/smoke/smoke.ps1"
   },
   "devDependencies": {
     "ajv-cli": "^5.0.0",

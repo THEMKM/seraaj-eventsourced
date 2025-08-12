@@ -63,7 +63,7 @@
       "checkpoint_file": "observability.done"
     },
     "CI_ENFORCER": {
-      "allowed_paths": [".github/workflows/**", "tools/validators/**"],
+      "allowed_paths": [".github/workflows/**", "tools/validators/**", "tools/ci/**", ".agents/checkpoints/ci.done", ".agents/runs/CI_ENFORCER/**"],
       "checkpoint_file": "ci.done"
     },
     "ORCHESTRATOR": {
