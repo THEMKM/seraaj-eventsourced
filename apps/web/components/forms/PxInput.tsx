@@ -14,19 +14,22 @@ export const PxInput = forwardRef<HTMLInputElement, PxInputProps>(function PxInp
   variant = 'default',
   size = 'md',
   className,
+  id,
   ...props
 }, ref) {
   const hasError = error || variant === 'error';
+  const inputId = id || `px-input-${Math.random().toString(36).substr(2, 9)}`;
   
   return (
     <div className="space-y-1">
       {label && (
-        <label className="block text-xs font-pixel text-sunBurst">
+        <label htmlFor={inputId} className="block text-xs font-pixel text-sunBurst">
           {label}
         </label>
       )}
       <input
         ref={ref}
+        id={inputId}
         className={clsx(
           'w-full border-2 bg-deepIndigo text-white font-pixel text-xs',
           'focus:outline-none focus:ring-2 focus:ring-offset-2',

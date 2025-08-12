@@ -82,5 +82,29 @@
     "reviewedAt": null,
     "createdAt": "2025-08-11T23:52:18.483384",
     "updatedAt": "2025-08-11T23:52:18.483384"
+  },
+  {
+    "id": "f4954219-da79-4703-9880-890ac341d910",
+    "volunteerId": "6b59ec2a-a529-44e0-af2e-adb64656153e",
+    "opportunityId": "opp6",
+    "organizationId": null,
+    "status": "submitted",
+    "coverLetter": "Integration test application via Applications service",
+    "submittedAt": "2025-08-12T15:39:29.843545",
+    "reviewedAt": null,
+    "createdAt": "2025-08-12T15:39:29.843545",
+    "updatedAt": "2025-08-12T15:39:29.843545"
+  },
+  {
+    "id": "dac1144a-f02f-4c63-89e9-b54bc3c91f8f",
+    "volunteerId": "6b59ec2a-a529-44e0-af2e-adb64656153e",
+    "opportunityId": "opp3",
+    "organizationId": null,
+    "status": "submitted",
+    "coverLetter": "Application submitted through BFF volunteer apply endpoint",
+    "submittedAt": "2025-08-12T15:45:49.934618",
+    "reviewedAt": null,
+    "createdAt": "2025-08-12T15:45:49.934618",
+    "updatedAt": "2025-08-12T15:45:49.934618"
   }
 ]

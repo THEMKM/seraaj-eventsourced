@@ -2,10 +2,11 @@
 const config = {
   testEnvironment: 'jsdom',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
-  moduleNameMapping: {
+  moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
     '^@seraaj/ui/(.*)$': '<rootDir>/../../packages/ui/$1',
     '^@seraaj/sdk-bff$': '<rootDir>/../../packages/sdk-bff',
+    '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
   },
   transform: {
     '^.+\\.(js|jsx|ts|tsx)$': ['@swc/jest'],
@@ -29,4 +30,4 @@ const config = {
   ],
 };
 
-module.exports = config;
+export default config;

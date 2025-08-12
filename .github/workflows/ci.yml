@@ -33,6 +33,9 @@ jobs:
     - name: Install dependencies
       run: pnpm install --frozen-lockfile
       
+    - name: Install additional test dependencies
+      run: pnpm add -D @types/jest -w
+      
     - name: TypeScript type checking
       run: pnpm type-check
       
@@ -112,7 +115,7 @@ jobs:
     - name: Run ${{ matrix.service }} service tests
       run: |
         if [ -d "services/${{ matrix.service }}/tests" ]; then
-          PYTHONPATH=$PWD pytest services/${{ matrix.service }}/tests -v --cov=services/${{ matrix.service }} --cov-report=xml
+          python -m pytest services/${{ matrix.service }}/tests -v --cov=services/${{ matrix.service }} --cov-report=xml
         else
           echo "No tests found for ${{ matrix.service }} service, skipping"
           exit 0
@@ -213,13 +216,13 @@ jobs:
         CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
         
     - name: Run BFF Health Tests
-      run: pytest bff/test_health.py -v
+      run: python -m pytest bff/test_health.py -v
       env:
         BFF_BASE_URL: http://127.0.0.1:8000
         PYTHONPATH: ${{ github.workspace }}
         
     - name: Run E2E Integration Tests
-      run: pytest tests/integration/ tests/e2e/ -v
+      run: python -m pytest tests/integration/ tests/e2e/ -v
       env:
         BFF_BASE_URL: http://127.0.0.1:8000
         DATABASE_URL: postgresql://test:test@localhost:5432/seraaj_test
