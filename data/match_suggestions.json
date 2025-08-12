@@ -5242,5 +5242,575 @@
     ],
     "generatedAt": "2025-08-12 17:35:38.972193",
     "status": "viewed"
+  },
+  {
+    "id": "a4e70c21-67b0-4d6d-aac8-599036b79dd8",
+    "volunteerId": "vol1",
+    "opportunityId": "opp1",
+    "organizationId": "org1",
+    "score": 1.0,
+    "scoreComponents": {
+      "distance": 1.0,
+      "skills": 1.0,
+      "availability": 1.0
+    },
+    "explanation": [
+      "Very close (< 5km)",
+      "All skills matched",
+      "Excellent time match"
+    ],
+    "generatedAt": "2025-08-12 18:00:40.938511+00:00",
+    "status": "pending"
+  },
+  {
+    "id": "559c329c-22b7-4cb3-9b72-4fcd326e6df3",
+    "volunteerId": "vol1",
+    "opportunityId": "opp3",
+    "organizationId": "org1",
+    "score": 1.0,
+    "scoreComponents": {
+      "distance": 1.0,
+      "skills": 1.0,
+      "availability": 1.0
+    },
+    "explanation": [
+      "Very close (< 5km)",
+      "All skills matched",
+      "Excellent time match"
+    ],
+    "generatedAt": "2025-08-12 18:00:40.944071+00:00",
+    "status": "pending"
+  },
+  {
+    "id": "291a3e68-1932-48a6-8721-9c9b94bb8803",
+    "volunteerId": "vol1",
+    "opportunityId": "opp6",
+    "organizationId": "org4",
+    "score": 1.0,
+    "scoreComponents": {
+      "distance": 1.0,
+      "skills": 1.0,
+      "availability": 1.0
+    },
+    "explanation": [
+      "Very close (< 5km)",
+      "No specific skills required",
+      "Excellent time match"
+    ],
+    "generatedAt": "2025-08-12 18:00:40.949514+00:00",
+    "status": "pending"
+  },
+  {
+    "id": "07f164e3-b6dc-4234-9bab-1e83bf97298b",
+    "volunteerId": "vol2",
+    "opportunityId": "opp2",
+    "organizationId": "org2",
+    "score": 1.0,
+    "scoreComponents": {
+      "distance": 1.0,
+      "skills": 1.0,
+      "availability": 1.0
+    },
+    "explanation": [
+      "Very close (< 5km)",
+      "All skills matched",
+      "Excellent time match"
+    ],
+    "generatedAt": "2025-08-12 18:00:40.961149+00:00",
+    "status": "pending"
+  },
+  {
+    "id": "ca7f95dd-0502-49b7-aa5a-d92cafbbee96",
+    "volunteerId": "vol2",
+    "opportunityId": "opp6",
+    "organizationId": "org4",
+    "score": 0.75,
+    "scoreComponents": {
+      "distance": 1.0,
+      "skills": 1.0,
+      "availability": 0.0
+    },
+    "explanation": [
+      "Very close (< 5km)",
+      "No specific skills required",
+      "Limited time overlap"
+    ],
+    "generatedAt": "2025-08-12 18:00:40.966879+00:00",
+    "status": "pending"
+  },
+  {
+    "id": "cb170499-d3f4-4772-9fe7-ef00b63c2366",
+    "volunteerId": "vol2",
+    "opportunityId": "opp5",
+    "organizationId": "org2",
+    "score": 0.7,
+    "scoreComponents": {
+      "distance": 1.0,
+      "skills": 0.5,
+      "availability": 0.5
+    },
+    "explanation": [
+      "Very close (< 5km)",
+      "50% skills matched",
+      "Good time match"
+    ],
+    "generatedAt": "2025-08-12 18:00:40.972457+00:00",
+    "status": "pending"
+  },
+  {
+    "id": "104049a2-846f-4b89-8818-ba92cdf57cef",
+    "volunteerId": "vol3",
+    "opportunityId": "opp4",
+    "organizationId": "org3",
+    "score": 1.0,
+    "scoreComponents": {
+      "distance": 1.0,
+      "skills": 1.0,
+      "availability": 1.0
+    },
+    "explanation": [
+      "Very close (< 5km)",
+      "All skills matched",
+      "Excellent time match"
+    ],
+    "generatedAt": "2025-08-12 18:00:40.982491+00:00",
+    "status": "pending"
+  },
+  {
+    "id": "b200e717-edba-4712-91de-6221e134ce08",
+    "volunteerId": "vol3",
+    "opportunityId": "opp6",
+    "organizationId": "org4",
+    "score": 0.5549999999999999,
+    "scoreComponents": {
+      "distance": 0.2,
+      "skills": 1.0,
+      "availability": 0.5
+    },
+    "explanation": [
+      "Far (180.0km)",
+      "No specific skills required",
+      "Good time match"
+    ],
+    "generatedAt": "2025-08-12 18:00:40.988421+00:00",
+    "status": "pending"
+  },
+  {
+    "id": "1e693ea0-8c4a-410c-a034-e2f44ea24f78",
+    "volunteerId": "vol1",
+    "opportunityId": "opp1",
+    "organizationId": "org1",
+    "score": 1.0,
+    "scoreComponents": {
+      "distance": 1.0,
+      "skills": 1.0,
+      "availability": 1.0
+    },
+    "explanation": [
+      "Very close (< 5km)",
+      "All skills matched",
+      "Excellent time match"
+    ],
+    "generatedAt": "2025-08-12 18:00:40.998414+00:00",
+    "status": "pending"
+  },
+  {
+    "id": "d598e8ac-477c-4a60-9931-1fc5aa8baa59",
+    "volunteerId": "vol1",
+    "opportunityId": "opp3",
+    "organizationId": "org1",
+    "score": 1.0,
+    "scoreComponents": {
+      "distance": 1.0,
+      "skills": 1.0,
+      "availability": 1.0
+    },
+    "explanation": [
+      "Very close (< 5km)",
+      "All skills matched",
+      "Excellent time match"
+    ],
+    "generatedAt": "2025-08-12 18:00:41.004142+00:00",
+    "status": "pending"
+  },
+  {
+    "id": "407604c3-1cec-4743-900a-d878d8273ac9",
+    "volunteerId": "vol1",
+    "opportunityId": "opp6",
+    "organizationId": "org4",
+    "score": 1.0,
+    "scoreComponents": {
+      "distance": 1.0,
+      "skills": 1.0,
+      "availability": 1.0
+    },
+    "explanation": [
+      "Very close (< 5km)",
+      "No specific skills required",
+      "Excellent time match"
+    ],
+    "generatedAt": "2025-08-12 18:00:41.009690+00:00",
+    "status": "pending"
+  },
+  {
+    "id": "3bc584c9-67ea-41a6-819c-44b9ee7a44e5",
+    "volunteerId": "vol1",
+    "opportunityId": "opp5",
+    "organizationId": "org2",
+    "score": 0.7,
+    "scoreComponents": {
+      "distance": 1.0,
+      "skills": 0.5,
+      "availability": 0.5
+    },
+    "explanation": [
+      "Very close (< 5km)",
+      "50% skills matched",
+      "Good time match"
+    ],
+    "generatedAt": "2025-08-12 18:00:41.015161+00:00",
+    "status": "pending"
+  },
+  {
+    "id": "91b41e6a-d965-496c-8b55-b41141f7b209",
+    "volunteerId": "vol1",
+    "opportunityId": "opp2",
+    "organizationId": "org2",
+    "score": 0.4,
+    "scoreComponents": {
+      "distance": 1.0,
+      "skills": 0.0,
+      "availability": 0.0
+    },
+    "explanation": [
+      "Very close (< 5km)",
+      "Only 0% skills matched",
+      "Limited time overlap"
+    ],
+    "generatedAt": "2025-08-12 18:00:41.020673+00:00",
+    "status": "pending"
+  },
+  {
+    "id": "6c1faac1-72da-4a66-9715-093365f61f0f",
+    "volunteerId": "vol1",
+    "opportunityId": "opp1",
+    "organizationId": "org1",
+    "score": 1.0,
+    "scoreComponents": {
+      "distance": 1.0,
+      "skills": 1.0,
+      "availability": 1.0
+    },
+    "explanation": [
+      "Very close (< 5km)",
+      "All skills matched",
+      "Excellent time match"
+    ],
+    "generatedAt": "2025-08-12 18:00:41.030295+00:00",
+    "status": "pending"
+  },
+  {
+    "id": "1cf0d34b-541b-494c-b724-2d0296e41b04",
+    "volunteerId": "vol1",
+    "opportunityId": "opp1",
+    "organizationId": "org1",
+    "score": 1.0,
+    "scoreComponents": {
+      "distance": 1.0,
+      "skills": 1.0,
+      "availability": 1.0
+    },
+    "explanation": [
+      "Very close (< 5km)",
+      "All skills matched",
+      "Excellent time match"
+    ],
+    "generatedAt": "2025-08-12 18:00:41.040064+00:00",
+    "status": "pending"
+  },
+  {
+    "id": "35b1bff2-d004-43c3-a209-420ea274d55f",
+    "volunteerId": "vol1",
+    "opportunityId": "opp3",
+    "organizationId": "org1",
+    "score": 1.0,
+    "scoreComponents": {
+      "distance": 1.0,
+      "skills": 1.0,
+      "availability": 1.0
+    },
+    "explanation": [
+      "Very close (< 5km)",
+      "All skills matched",
+      "Excellent time match"
+    ],
+    "generatedAt": "2025-08-12 18:00:41.045794+00:00",
+    "status": "pending"
+  },
+  {
+    "id": "70267950-5c9b-4d09-a843-b604219d53c3",
+    "volunteerId": "vol1",
+    "opportunityId": "opp6",
+    "organizationId": "org4",
+    "score": 1.0,
+    "scoreComponents": {
+      "distance": 1.0,
+      "skills": 1.0,
+      "availability": 1.0
+    },
+    "explanation": [
+      "Very close (< 5km)",
+      "No specific skills required",
+      "Excellent time match"
+    ],
+    "generatedAt": "2025-08-12 18:00:41.051506+00:00",
+    "status": "pending"
+  },
+  {
+    "id": "53e6a4ef-e14c-47c2-8510-d3096570ab76",
+    "volunteerId": "unknown_vol",
+    "opportunityId": "opp6",
+    "organizationId": "org4",
+    "score": 0.875,
+    "scoreComponents": {
+      "distance": 1.0,
+      "skills": 1.0,
+      "availability": 0.5
+    },
+    "explanation": [
+      "Very close (< 5km)",
+      "No specific skills required",
+      "Good time match"
+    ],
+    "generatedAt": "2025-08-12 18:00:41.065039+00:00",
+    "status": "pending"
+  },
+  {
+    "id": "dea6c703-b052-4090-83ed-88cef2231308",
+    "volunteerId": "unknown_vol",
+    "opportunityId": "opp1",
+    "organizationId": "org1",
+    "score": 0.525,
+    "scoreComponents": {
+      "distance": 1.0,
+      "skills": 0.0,
+      "availability": 0.5
+    },
+    "explanation": [
+      "Very close (< 5km)",
+      "Only 0% skills matched",
+      "Good time match"
+    ],
+    "generatedAt": "2025-08-12 18:00:41.070841+00:00",
+    "status": "pending"
+  },
+  {
+    "id": "bb272c9a-f3fa-43aa-a943-a3c5a45e3e1e",
+    "volunteerId": "unknown_vol",
+    "opportunityId": "opp3",
+    "organizationId": "org1",
+    "score": 0.525,
+    "scoreComponents": {
+      "distance": 1.0,
+      "skills": 0.0,
+      "availability": 0.5
+    },
+    "explanation": [
+      "Very close (< 5km)",
+      "Only 0% skills matched",
+      "Good time match"
+    ],
+    "generatedAt": "2025-08-12 18:00:41.076709+00:00",
+    "status": "pending"
+  },
+  {
+    "id": "1b2eb839-180f-4478-9bf2-41ce93ecf0e3",
+    "volunteerId": "vol1",
+    "opportunityId": "opp1",
+    "organizationId": "org1",
+    "score": 1.0,
+    "scoreComponents": {
+      "distance": 1.0,
+      "skills": 1.0,
+      "availability": 1.0
+    },
+    "explanation": [
+      "Very close (< 5km)",
+      "All skills matched",
+      "Excellent time match"
+    ],
+    "generatedAt": "2025-08-12 18:00:41.086592+00:00",
+    "status": "pending"
+  },
+  {
+    "id": "f79c45aa-805f-4dd6-847e-0445a60a927e",
+    "volunteerId": "vol1",
+    "opportunityId": "opp1",
+    "organizationId": "org1",
+    "score": 1.0,
+    "scoreComponents": {
+      "distance": 1.0,
+      "skills": 1.0,
+      "availability": 1.0
+    },
+    "explanation": [
+      "Very close (< 5km)",
+      "All skills matched",
+      "Excellent time match"
+    ],
+    "generatedAt": "2025-08-12 18:00:41.096506+00:00",
+    "status": "pending"
+  },
+  {
+    "id": "141063bb-821d-4cbd-aa97-06ef69bf668d",
+    "volunteerId": "vol1",
+    "opportunityId": "opp1",
+    "organizationId": "org1",
+    "score": 1.0,
+    "scoreComponents": {
+      "distance": 1.0,
+      "skills": 1.0,
+      "availability": 1.0
+    },
+    "explanation": [
+      "Very close (< 5km)",
+      "All skills matched",
+      "Excellent time match"
+    ],
+    "generatedAt": "2025-08-12 18:00:41.106575+00:00",
+    "status": "pending"
+  },
+  {
+    "id": "7cf2c44b-fb82-4b68-809c-6a42e1952a66",
+    "volunteerId": "vol1",
+    "opportunityId": "opp3",
+    "organizationId": "org1",
+    "score": 1.0,
+    "scoreComponents": {
+      "distance": 1.0,
+      "skills": 1.0,
+      "availability": 1.0
+    },
+    "explanation": [
+      "Very close (< 5km)",
+      "All skills matched",
+      "Excellent time match"
+    ],
+    "generatedAt": "2025-08-12 18:00:41.112428+00:00",
+    "status": "pending"
+  },
+  {
+    "id": "1a795509-93b3-499e-af5e-49d15cc1bc2a",
+    "volunteerId": "vol1",
+    "opportunityId": "opp1",
+    "organizationId": "org1",
+    "score": 1.0,
+    "scoreComponents": {
+      "distance": 1.0,
+      "skills": 1.0,
+      "availability": 1.0
+    },
+    "explanation": [
+      "Very close (< 5km)",
+      "All skills matched",
+      "Excellent time match"
+    ],
+    "generatedAt": "2025-08-12 18:00:41.119119+00:00",
+    "status": "pending"
+  },
+  {
+    "id": "90900b35-28f5-4012-8a6c-29551609c236",
+    "volunteerId": "vol1",
+    "opportunityId": "opp3",
+    "organizationId": "org1",
+    "score": 1.0,
+    "scoreComponents": {
+      "distance": 1.0,
+      "skills": 1.0,
+      "availability": 1.0
+    },
+    "explanation": [
+      "Very close (< 5km)",
+      "All skills matched",
+      "Excellent time match"
+    ],
+    "generatedAt": "2025-08-12 18:00:41.125109+00:00",
+    "status": "pending"
+  },
+  {
+    "id": "cdd28091-94b9-4505-9c10-f3bb8bcf3346",
+    "volunteerId": "fc915b71-e1c0-41db-9aa8-a09f1cfbf869",
+    "opportunityId": "251e04d7-ff31-4c57-9643-e262ec6b4b81",
+    "organizationId": "3e7ec0cb-267a-4994-b0d1-87ac1d61bcf2",
+    "score": 0.85,
+    "scoreComponents": {
+      "distance": 0.9,
+      "skills": 0.8,
+      "availability": 0.85
+    },
+    "explanation": [
+      "Great match based on location and skills",
+      "Close to your location",
+      "Skills match required expertise"
+    ],
+    "generatedAt": "2025-08-12 18:01:03.630028",
+    "status": "viewed"
+  },
+  {
+    "id": "b76af27b-5f07-4021-8027-fea6ff73c7c2",
+    "volunteerId": "474c7427-9ee6-455a-85cc-9001cee1512e",
+    "opportunityId": "7a45508f-4bef-4c82-8514-8cd7d6596056",
+    "organizationId": "dd424191-cf9f-4121-bf0d-1eec43e16757",
+    "score": 0.75,
+    "scoreComponents": {
+      "distance": 0.8,
+      "skills": 0.7,
+      "availability": 0.75
+    },
+    "explanation": [
+      "Good match",
+      "Skills align",
+      "Available when needed"
+    ],
+    "generatedAt": "2025-08-12 18:01:03.654515",
+    "status": "viewed"
+  },
+  {
+    "id": "f9f8bcd4-c80b-4d89-b2a3-c4b11828785d",
+    "volunteerId": "ef7df201-cea6-4a76-b55e-8127dddd3965",
+    "opportunityId": "12aa4d87-46a6-4d8d-8af0-1cb0e569680e",
+    "organizationId": "04eedc56-7148-44fb-9056-7bb4063eb5a5",
+    "score": 0.85,
+    "scoreComponents": {
+      "distance": 0.9,
+      "skills": 0.8,
+      "availability": 0.85
+    },
+    "explanation": [
+      "Great match based on location and skills",
+      "Close to your location",
+      "Skills match required expertise"
+    ],
+    "generatedAt": "2025-08-12 18:02:47.246531",
+    "status": "viewed"
+  },
+  {
+    "id": "5f3ffc11-6047-4f5e-8716-34c39e3cba73",
+    "volunteerId": "2a853c3e-e7d6-4da0-97ca-ff0f703a8202",
+    "opportunityId": "a84fb7c2-b366-4328-8544-eecae27a1935",
+    "organizationId": "02afb24e-6af3-4b25-aaea-58027850eeee",
+    "score": 0.75,
+    "scoreComponents": {
+      "distance": 0.8,
+      "skills": 0.7,
+      "availability": 0.75
+    },
+    "explanation": [
+      "Good match",
+      "Skills align",
+      "Available when needed"
+    ],
+    "generatedAt": "2025-08-12 18:02:47.268639",
+    "status": "viewed"
   }
 ]
