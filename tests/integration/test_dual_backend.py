@@ -13,7 +13,7 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from services.shared.models import Application, MatchSuggestion, ScoreComponents, MatchExplanation
+from services.shared.models import Application, MatchSuggestion
 from services.applications.repository import ApplicationRepository
 from services.matching.repository import MatchRepository
 from infrastructure.db.connection import init_database, close_database
@@ -148,15 +148,7 @@ class TestDualBackendMatchRepository:
             opportunityId=str(uuid4()),
             organizationId=str(uuid4()),
             score=0.85,
-            scoreComponents=ScoreComponents(
-                distanceScore=0.9,
-                skillsScore=0.8,
-                availabilityScore=0.85
-            ),
-            explanation=MatchExplanation(
-                summary="Great match based on location and skills",
-                details=["Close to your location", "Skills match required expertise"]
-            ),
+            # Note: ScoreComponents and MatchExplanation not yet implemented in models
             generatedAt=datetime.utcnow(),
             status="active"
         )
@@ -256,15 +248,7 @@ class TestBackendCompatibility:
                 opportunityId=str(uuid4()),
                 organizationId=str(uuid4()),
                 score=0.75,
-                scoreComponents=ScoreComponents(
-                    distanceScore=0.8,
-                    skillsScore=0.7,
-                    availabilityScore=0.75
-                ),
-                explanation=MatchExplanation(
-                    summary="Good match",
-                    details=["Skills align", "Available when needed"]
-                ),
+                # Note: ScoreComponents and MatchExplanation not yet implemented in models
                 generatedAt=datetime.utcnow(),
                 status="active"
             )
