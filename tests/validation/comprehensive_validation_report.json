@@ -1,0 +1,51 @@
+{
+  "timestamp": "2025-08-13T23:35:43.955193+00:00",
+  "validation_type": "comprehensive_post_sdk_fixes",
+  "checks": [
+    "[OK] Contracts frozen at version 1.1.0",
+    "[OK] Contract checksum present",
+    "[OK] Found 14 agent checkpoints",
+    "[OK] Critical checkpoint exists: contracts.done",
+    "[OK] Critical checkpoint exists: generation.done",
+    "[OK] Critical checkpoint exists: applications.done",
+    "[OK] Critical checkpoint exists: matching.done",
+    "[OK] Critical checkpoint exists: orchestration.done",
+    "[OK] SDK package directory exists",
+    "[OK] SDK index file exists and is not empty",
+    "[OK] All expected SDK exports present",
+    "[OK] SDK package.json valid: @seraaj/sdk-bff",
+    "[OK] Frontend BFF client exists",
+    "[OK] All expected SDK imports present in frontend",
+    "[OK] Data directory exists",
+    "[OK] Found 3 event files",
+    "[OK] Event store contains 79 events",
+    "[OK] Found 2 data files",
+    "[OK] Performance test: Average response time 3.85s"
+  ],
+  "warnings": [
+    "[WARN] TypeScript compiler not available",
+    "[WARN] Applications Service unreachable: All connection attempts failed...",
+    "[WARN] Matching Service unreachable: All connection attempts failed...",
+    "[WARN] Performance test: Only 0/10 requests successful"
+  ],
+  "errors": [
+    "[ERROR] BFF unreachable: All connection attempts failed...",
+    "[ERROR] Health API error: All connection attempts failed",
+    "[ERROR] Quick match API error: All connection attempts failed",
+    "[ERROR] Dashboard API error: All connection attempts failed",
+    "[ERROR] Application API error: All connection attempts failed",
+    "[ERROR] Frontend not accessible: All connection attempts failed"
+  ],
+  "performance": {
+    "concurrent_success_rate": 0.0,
+    "average_response_time": 3.8471160650253298,
+    "total_concurrent_time": 5.748215198516846
+  },
+  "summary": {
+    "total_checks": 19,
+    "total_warnings": 4,
+    "total_errors": 6,
+    "validation_status": "FAILED",
+    "confidence_level": "LOW"
+  }
+}

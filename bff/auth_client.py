@@ -8,7 +8,7 @@ from datetime import datetime
 class AuthClient:
     """Client for communicating with the Auth service"""
     
-    def __init__(self, base_url: str = "http://localhost:8001"):
+    def __init__(self, base_url: str = "http://localhost:8004"):
         self.base_url = base_url.rstrip("/")
         self.client = httpx.AsyncClient(base_url=self.base_url)
     

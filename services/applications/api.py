@@ -6,11 +6,13 @@ from typing import List, Optional
 from uuid import UUID
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Depends, Request
+from fastapi import FastAPI, HTTPException, Depends, Request, Header
+import os
+import jwt
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from services.shared.models import Application
+from services.shared.models import Application, ExternalApplication
 from services.shared.logging_config import (
     StructuredLoggingMiddleware, 
     setup_json_logging, 
@@ -110,11 +112,12 @@ async def readiness_check():
 
 
 # Application endpoints
-@app.post("/api/applications", response_model=Application, status_code=201)
+@app.post("/api/applications", response_model=ExternalApplication, status_code=201)
 async def submit_application(
     request: SubmitApplicationRequest,
     req: Request,
-    service: ApplicationService = Depends(get_application_service)
+    service: ApplicationService = Depends(get_application_service),
+    _token: dict | None = Depends(verify_service_token)
 ):
     """Submit a new application"""
     trace_id = get_trace_id(req)
@@ -130,9 +133,9 @@ async def submit_application(
     
     try:
         command = SubmitApplicationCommand(
-            volunteer_id=request.volunteerId,
-            opportunity_id=request.opportunityId,
-            cover_letter=request.coverLetter
+            volunteerId=request.volunteerId,
+            opportunityId=request.opportunityId,
+            coverLetter=request.coverLetter
         )
         application = await service.submit_application(command)
         
@@ -156,7 +159,10 @@ async def submit_application(
             opportunityId=request.opportunityId
         )
         
-        return application
+        # Map internal status to external contract value
+        application_dict = application.dict()
+        application_dict['status'] = application.status.to_external_status() if hasattr(application.status, 'to_external_status') else application.status
+        return application_dict
         
     except ValueError as e:
         # Log business logic errors
@@ -183,11 +189,12 @@ async def submit_application(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@app.get("/api/applications/{application_id}", response_model=Application)
+@app.get("/api/applications/{application_id}", response_model=ExternalApplication)
 async def get_application(
     application_id: str,
     req: Request,
-    service: ApplicationService = Depends(get_application_service)
+    service: ApplicationService = Depends(get_application_service),
+    _token: dict | None = Depends(verify_service_token)
 ):
     """Get application by ID"""
     trace_id = get_trace_id(req)
@@ -217,7 +224,9 @@ async def get_application(
             applicationId=application_id,
             volunteerId=application.volunteer_id
         )
-        return application
+        application_dict = application.dict()
+        application_dict['status'] = application.status.to_external_status() if hasattr(application.status, 'to_external_status') else application.status
+        return application_dict
         
     except HTTPException:
         raise
@@ -232,12 +241,13 @@ async def get_application(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@app.patch("/api/applications/{application_id}/state", response_model=Application)
+@app.patch("/api/applications/{application_id}/state", response_model=ExternalApplication)
 async def update_application_state(
     application_id: str,
     request: UpdateStateRequest,
     req: Request,
-    service: ApplicationService = Depends(get_application_service)
+    service: ApplicationService = Depends(get_application_service),
+    _token: dict | None = Depends(verify_service_token)
 ):
     """Update application state"""
     trace_id = get_trace_id(req)
@@ -275,7 +285,9 @@ async def update_application_state(
             newState=application.status
         )
         
-        return application
+        application_dict = application.dict()
+        application_dict['status'] = application.status.to_external_status() if hasattr(application.status, 'to_external_status') else application.status
+        return application_dict
         
     except ValueError as e:
         log_structured(
@@ -298,11 +310,12 @@ async def update_application_state(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@app.get("/api/applications/volunteer/{volunteer_id}", response_model=List[Application])
+@app.get("/api/applications/volunteer/{volunteer_id}", response_model=List[ExternalApplication])
 async def get_volunteer_applications(
     volunteer_id: str,
     req: Request,
-    service: ApplicationService = Depends(get_application_service)
+    service: ApplicationService = Depends(get_application_service),
+    _token: dict | None = Depends(verify_service_token)
 ):
     """Get all applications for a volunteer"""
     trace_id = get_trace_id(req)
@@ -325,7 +338,12 @@ async def get_volunteer_applications(
             applicationCount=len(applications)
         )
         
-        return applications
+        external_applications = []
+        for app in applications:
+            app_dict = app.dict()
+            app_dict['status'] = app.status.to_external_status() if hasattr(app.status, 'to_external_status') else app.status
+            external_applications.append(app_dict)
+        return external_applications
     except Exception as e:
         log_structured(
             logger, "ERROR", "Unexpected error in volunteer applications retrieval",
@@ -337,11 +355,12 @@ async def get_volunteer_applications(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@app.get("/api/applications/opportunity/{opportunity_id}", response_model=List[Application])
+@app.get("/api/applications/opportunity/{opportunity_id}", response_model=List[ExternalApplication])
 async def get_opportunity_applications(
     opportunity_id: str,
     req: Request,
-    service: ApplicationService = Depends(get_application_service)
+    service: ApplicationService = Depends(get_application_service),
+    _token: dict | None = Depends(verify_service_token)
 ):
     """Get all applications for an opportunity"""
     trace_id = get_trace_id(req)
@@ -364,7 +383,12 @@ async def get_opportunity_applications(
             applicationCount=len(applications)
         )
         
-        return applications
+        external_applications = []
+        for app in applications:
+            app_dict = app.dict()
+            app_dict['status'] = app.status.to_external_status() if hasattr(app.status, 'to_external_status') else app.status
+            external_applications.append(app_dict)
+        return external_applications
     except Exception as e:
         log_structured(
             logger, "ERROR", "Unexpected error in opportunity applications retrieval",
@@ -374,6 +398,22 @@ async def get_opportunity_applications(
             opportunityId=opportunity_id
         )
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+# Lightweight JWT verification (optional enforcement via REQUIRE_SERVICE_AUTH)
+def verify_service_token(authorization: str | None = Header(default=None)) -> dict | None:
+    require = os.getenv('REQUIRE_SERVICE_AUTH', 'false').lower() == 'true'
+    if not authorization or not authorization.startswith('Bearer '):
+        if require:
+            raise HTTPException(status_code=401, detail='Missing or invalid token')
+        return None
+    token = authorization.split(' ', 1)[1]
+    secret = os.getenv('JWT_SECRET', 'dev-secret-change-in-production')
+    try:
+        payload = jwt.decode(token, secret, algorithms=['HS256'])
+        return payload
+    except Exception:
+        if require:
+            raise HTTPException(status_code=401, detail='Invalid token')
+        return None
 
 
 # Main entry point

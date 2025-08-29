@@ -5,18 +5,27 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import uuid4
 
-from services.shared.models import Application
+from services.shared.models import Application, ApplicationStatus
 from .repository import ApplicationRepository
 from .state_machine import ApplicationStateMachine, ApplicationState
 from .events import EventPublisher
 
 
 class SubmitApplicationCommand:
-    """Command for submitting an application"""
-    def __init__(self, volunteer_id: str, opportunity_id: str, cover_letter: Optional[str] = None):
-        self.volunteerId = volunteer_id
-        self.opportunityId = opportunity_id
-        self.coverLetter = cover_letter
+    """Command for submitting an application (supports camelCase and snake_case)"""
+    def __init__(
+        self,
+        volunteerId: Optional[str] = None,
+        opportunityId: Optional[str] = None,
+        coverLetter: Optional[str] = None,
+        # Backward-compatible snake_case parameters used in tests
+        volunteer_id: Optional[str] = None,
+        opportunity_id: Optional[str] = None,
+        cover_letter: Optional[str] = None,
+    ):
+        self.volunteerId = volunteerId or volunteer_id  # type: ignore[assignment]
+        self.opportunityId = opportunityId or opportunity_id  # type: ignore[assignment]
+        self.coverLetter = coverLetter if coverLetter is not None else cover_letter
 
 
 class ApplicationService:
@@ -41,7 +50,7 @@ class ApplicationService:
         existing_apps = await self.repository.find_by_volunteer(command.volunteerId)
         for app in existing_apps:
             if (app.opportunityId == command.opportunityId and 
-                app.status not in ['rejected', 'cancelled', 'completed']):
+                app.status not in [ApplicationStatus.rejected, ApplicationStatus.cancelled, ApplicationStatus.completed]):
                 raise ValueError(f"Application already exists for this opportunity")
         
         # Create application

@@ -109,7 +109,7 @@ class UserRepository:
         
         # Create registration event
         event = {
-            "id": str(uuid4()),
+            "eventId": str(uuid4()),
             "timestamp": datetime.utcnow().isoformat(),
             "type": "user_registered",
             "userId": user_id,
@@ -149,7 +149,7 @@ class UserRepository:
             return None
         
         event = {
-            "id": str(uuid4()),
+            "eventId": str(uuid4()),
             "timestamp": datetime.utcnow().isoformat(),
             "type": "user_password_updated",
             "userId": user_id,
@@ -168,7 +168,7 @@ class UserRepository:
             return None
         
         event = {
-            "id": str(uuid4()),
+            "eventId": str(uuid4()),
             "timestamp": datetime.utcnow().isoformat(),
             "type": "user_deactivated",
             "userId": user_id,
@@ -186,7 +186,7 @@ class UserRepository:
             return None
         
         event = {
-            "id": str(uuid4()),
+            "eventId": str(uuid4()),
             "timestamp": datetime.utcnow().isoformat(),
             "type": "user_login",
             "userId": user_id,

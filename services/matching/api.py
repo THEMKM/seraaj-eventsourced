@@ -1,4 +1,6 @@
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, Header, Depends
+import os
+import jwt
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
@@ -26,11 +28,29 @@ app.add_middleware(StructuredLoggingMiddleware, service_name="matching")
 # Setup optional OpenTelemetry
 setup_telemetry(app, "matching")
 
+# Optional JWT verification, controlled by REQUIRE_SERVICE_AUTH
+def verify_service_token(authorization: str | None = Header(default=None)) -> dict | None:
+    require = os.getenv('REQUIRE_SERVICE_AUTH', 'false').lower() == 'true'
+    if not authorization or not authorization.startswith('Bearer '):
+        if require:
+            raise HTTPException(status_code=401, detail='Missing or invalid token')
+        return None
+    token = authorization.split(' ', 1)[1]
+    secret = os.getenv('JWT_SECRET', 'dev-secret-change-in-production')
+    try:
+        payload = jwt.decode(token, secret, algorithms=['HS256'])
+        return payload
+    except Exception:
+        if require:
+            raise HTTPException(status_code=401, detail='Invalid token')
+        return None
+
 @app.post("/quick-match", response_model=List[MatchSuggestion])
 async def quick_match(
     volunteer_id: str = Query(..., description="Volunteer ID to match"),
     limit: int = Query(3, description="Number of matches to return", ge=1, le=10),
-    request: Request = None
+    request: Request = None,
+    _token: dict | None = Depends(verify_service_token)
 ):
     """Generate quick match suggestions (top matches)"""
     trace_id = get_trace_id(request) if request else None
@@ -107,7 +127,8 @@ async def generate_matches(
     volunteer_id: str = Query(..., description="Volunteer ID to match"),
     category: Optional[str] = Query(None, description="Filter by opportunity category"),
     limit: int = Query(10, description="Number of matches to return", ge=1, le=50),
-    request: Request = None
+    request: Request = None,
+    _token: dict | None = Depends(verify_service_token)
 ):
     """Generate comprehensive match suggestions"""
     trace_id = get_trace_id(request) if request else None
@@ -172,7 +193,7 @@ async def generate_matches(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @app.get("/suggestions/{volunteer_id}", response_model=List[MatchSuggestion])
-async def get_suggestions(volunteer_id: str, request: Request = None):
+async def get_suggestions(volunteer_id: str, request: Request = None, _token: dict | None = Depends(verify_service_token)):
     """Get existing suggestions for a volunteer"""
     trace_id = get_trace_id(request) if request else None
     

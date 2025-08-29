@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { PxButton, PxCard, PxLoading, PxBadge, PxChip } from '@seraaj/ui';
 import { Header } from '@/components/navigation/Header';
 import { useToast } from '@/contexts/ToastContext';
+import { volunteerApi } from '@/lib/bff';
 
 // Define match response type based on actual API
 interface MatchResponse {
@@ -32,22 +33,12 @@ export default function DemoPage() {
       setIsLoading(true);
       showInfo('Scanning for perfect quests... 🔍');
       
-      const response = await fetch('http://localhost:8000/api/volunteer/quick-match', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          volunteerId: 'demo-hero-' + Date.now(),
-          limit: 10
-        })
-      });
+      // Use SDK instead of direct fetch
+      const data = await volunteerApi.getQuickMatch({
+        volunteerId: 'demo-hero-' + Date.now(),
+        limit: 10
+      }) as unknown as MatchResponse[]; // Cast due to contract mismatch
       
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const data: MatchResponse[] = await response.json();
       setMatches(data);
       showSuccess(`Found ${data.length} epic quests for you! 🎆`);
     } catch (error) {
@@ -62,26 +53,16 @@ export default function DemoPage() {
     try {
       showInfo('Submitting heroic application... 📨');
       
-      const response = await fetch('http://localhost:8000/api/volunteer/apply', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          volunteerId: 'demo-hero-' + Date.now(),
-          opportunityId,
-          coverLetter: 'I am excited to join this heroic quest and make a positive impact!'
-        })
+      // Use SDK instead of direct fetch
+      await volunteerApi.submitApplication({
+        volunteerId: 'demo-hero-' + Date.now(),
+        opportunityId,
+        coverLetter: 'I am excited to join this heroic quest and make a positive impact!'
       });
       
-      if (response.ok) {
-        showSuccess('Application submitted successfully! 🎆 Your heroic credentials have been sent!');
-        // Remove applied opportunity from list
-        setMatches(prev => prev.filter(m => m.opportunityId !== opportunityId));
-      } else {
-        const error = await response.json().catch(() => ({ detail: 'Application failed' }));
-        showError(`Application failed: ${error.detail}`);
-      }
+      showSuccess('Application submitted successfully! 🎆 Your heroic credentials have been sent!');
+      // Remove applied opportunity from list
+      setMatches(prev => prev.filter(m => m.opportunityId !== opportunityId));
     } catch (error) {
       console.error('Failed to apply:', error);
       showError('Failed to submit application. The quest masters might be busy.');

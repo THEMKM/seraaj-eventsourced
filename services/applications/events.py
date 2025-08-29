@@ -45,6 +45,7 @@ class EventPublisher:
             "eventId": str(uuid4()),
             "eventType": event_type,
             "timestamp": datetime.utcnow().isoformat(),
+            "organizationId": data.get("organizationId"),
             "data": data
         }
         

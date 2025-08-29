@@ -17,7 +17,8 @@ class ApplicationsAdapter:
         self, 
         volunteer_id: str, 
         opportunity_id: str, 
-        cover_letter: Optional[str] = None
+        cover_letter: Optional[str] = None,
+        authorization: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Submit application to Applications service
@@ -34,7 +35,8 @@ class ApplicationsAdapter:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(
                     f"{self.base_url}/api/applications",
-                    json=payload
+                    json=payload,
+                    headers=({"Authorization": authorization} if authorization else None)
                 )
                 
                 if response.status_code == 201:
@@ -58,14 +60,15 @@ class ApplicationsAdapter:
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Internal error calling applications service: {str(e)}")
     
-    async def get_volunteer_applications(self, volunteer_id: str) -> List[Dict[str, Any]]:
+    async def get_volunteer_applications(self, volunteer_id: str, authorization: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Get applications for a volunteer from Applications service
         """
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(
-                    f"{self.base_url}/api/applications/volunteer/{volunteer_id}"
+                    f"{self.base_url}/api/applications/volunteer/{volunteer_id}",
+                    headers=({"Authorization": authorization} if authorization else None)
                 )
                 
                 if response.status_code == 200:

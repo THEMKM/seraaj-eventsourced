@@ -1,12 +1,24 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
-import { OpportunityDetails } from '@seraaj/sdk-bff';
-import { createAuthenticatedVolunteerApi } from '@/lib/bff';
+// Removed import of non-existent types - using local interfaces instead
+import { volunteerApi } from '@/lib/bff';
 import { useAuth } from './AuthContext';
 import { useToast } from './ToastContext';
 
-// Define types to match the actual API response
+// Local interface since it's not in the SDK yet
+interface OpportunityDetails {
+  id: string;
+  title: string;
+  description: string;
+  organizationName: string;
+  location: string;
+  requirements: string[];
+  timeCommitment: string;
+  isActive: boolean;
+}
+
+// Define the actual API response structure (doesn't match contract yet)
 interface MatchResponse {
   id: string;
   volunteerId: string;
@@ -41,33 +53,21 @@ export function OpportunitiesProvider({ children }: { children: ReactNode }) {
   const [selectedOpportunity, setSelectedOpportunity] = useState<OpportunityDetails | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
-  const { user, tokens } = useAuth();
+  const { user } = useAuth();
   const { showSuccess, showError } = useToast();
 
   const loadQuickMatches = useCallback(async (limit = 10) => {
     try {
       setIsLoading(true);
       
-      // Use a test volunteer ID for now since auth might not be working
+      // Use the SDK but cast the result since there's a contract mismatch
       const volunteerId = user?.id || 'test-volunteer-123';
       
-      const response = await fetch('http://localhost:8000/api/volunteer/quick-match', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(tokens?.accessToken ? { 'Authorization': `Bearer ${tokens.accessToken}` } : {})
-        },
-        body: JSON.stringify({
-          volunteerId,
-          limit
-        })
-      });
+      const matches = await volunteerApi.getQuickMatch({
+        volunteerId,
+        limit
+      }) as unknown as MatchResponse[]; // Cast due to contract mismatch
       
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const matches: MatchResponse[] = await response.json();
       setOpportunities(matches || []);
       showSuccess(`Found ${matches?.length || 0} quest matches for you! 🎆`);
     } catch (error) {
@@ -76,13 +76,13 @@ export function OpportunitiesProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [user, tokens, showSuccess, showError]);
+  }, [user, showSuccess, showError]);
 
   const loadOpportunityDetails = useCallback(async (opportunityId: string) => {
     try {
       setIsLoading(true);
       
-      // Find from existing opportunities (since we have match data)
+      // Find from existing opportunities using opportunityId (not id)
       const opportunity = opportunities.find(opp => opp.opportunityId === opportunityId);
       if (opportunity) {
         setSelectedOpportunity({
@@ -91,8 +91,8 @@ export function OpportunitiesProvider({ children }: { children: ReactNode }) {
           description: `An exciting volunteer opportunity with a ${Math.round(opportunity.score * 100)}% match score!`,
           organizationName: `Organization ${opportunity.organizationId.toUpperCase()}`,
           location: 'MENA Region',
-          requirements: opportunity.explanation,
-          timeCommitment: `${opportunity.scoreComponents.availability * 100}% time commitment`,
+          requirements: opportunity.explanation, // explanation maps to requirements
+          timeCommitment: `${Math.round(opportunity.scoreComponents.availability * 100)}% time commitment`,
           isActive: opportunity.status === 'pending'
         } as OpportunityDetails);
       } else {
@@ -113,27 +113,16 @@ export function OpportunitiesProvider({ children }: { children: ReactNode }) {
       // Use test volunteer ID if user not available
       const volunteerId = user?.id || 'test-volunteer-123';
       
-      const response = await fetch('http://localhost:8000/api/volunteer/apply', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(tokens?.accessToken ? { 'Authorization': `Bearer ${tokens.accessToken}` } : {})
-        },
-        body: JSON.stringify({
-          volunteerId,
-          opportunityId,
-          coverLetter: coverLetter || 'I am interested in this opportunity and would like to help!'
-        })
+      // Use the SDK instead of direct HTTP calls
+      await volunteerApi.submitApplication({
+        volunteerId,
+        opportunityId,
+        coverLetter: coverLetter || 'I am interested in this opportunity and would like to help!'
       });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Application failed' }));
-        throw new Error(errorData.detail || 'Application failed');
-      }
       
       showSuccess('Quest application submitted successfully! 🎆 The organization will review your heroic credentials.');
       
-      // Remove the opportunity from the list (already applied)
+      // Remove the opportunity from the list (already applied) - use opportunityId
       setOpportunities(prev => prev.filter(opp => opp.opportunityId !== opportunityId));
       setSelectedOpportunity(null);
     } catch (error) {
@@ -142,7 +131,7 @@ export function OpportunitiesProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsApplying(false);
     }
-  }, [user, tokens, showSuccess, showError]);
+  }, [user, showSuccess, showError]);
 
   const clearSelectedOpportunity = useCallback(() => {
     setSelectedOpportunity(null);

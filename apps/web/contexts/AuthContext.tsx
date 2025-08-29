@@ -91,8 +91,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTokens(tokenData);
     localStorage.setItem('seraaj_tokens', JSON.stringify(tokenData));
     
-    // Update auth API token for future requests
-    authApi.configuration.accessToken = tokenData.accessToken;
+    // Note: authApi is configured without dynamic tokens
+    // Token will be retrieved dynamically from localStorage by other API clients
   };
 
   const login = async (email: string, password: string): Promise<void> => {
@@ -124,10 +124,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setTokens(null);
     localStorage.removeItem('seraaj_tokens');
-    // Clear auth API token
-    if (authApi.configuration) {
-      authApi.configuration.accessToken = undefined;
-    }
+    // Note: tokens are cleared from localStorage
+    // Other API clients will detect this automatically
   };
 
   const refreshAuth = async (): Promise<void> => {

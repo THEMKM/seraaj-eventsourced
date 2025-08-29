@@ -5,7 +5,7 @@ import { useOpportunities } from '@/contexts/OpportunitiesContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Header } from '@/components/navigation/Header';
-import { PxButton, PxCard, PxChip, PxLoading, PxModal, PxBadge } from '@seraaj/ui';
+import { PxButton, PxCard, PxLoading, PxModal, PxBadge } from '@seraaj/ui';
 import { useState } from 'react';
 
 export default function OpportunitiesPage() {
@@ -27,7 +27,7 @@ export default function OpportunitiesPage() {
 
   const handleApply = (opportunityId: string) => {
     setSelectedOpportunityId(opportunityId);
-    setApplicationMessage(`Hi! I'm ${user?.name} and I'm excited about this opportunity. I believe my skills and passion align well with this cause. I would love to contribute and make a positive impact in the community.`);
+    setApplicationMessage(`Hi! I&apos;m ${user?.name} and I&apos;m excited about this opportunity. I believe my skills and passion align well with this cause. I would love to contribute and make a positive impact in the community.`);
   };
 
   const handleConfirmApplication = async () => {
@@ -169,7 +169,7 @@ export default function OpportunitiesPage() {
                             {match.explanation && match.explanation.length > 0 && (
                               <div className="space-y-2">
                                 <p className="text-electric-teal text-xs font-pixel">
-                                  📝 WHY IT'S A MATCH:
+                                  📝 WHY IT&apos;S A MATCH:
                                 </p>
                                 <div className="space-y-1">
                                   {match.explanation.map((reason, index) => (
@@ -218,7 +218,7 @@ export default function OpportunitiesPage() {
                 ✨ QUEST APPLICATION ✨
               </p>
               <p className="text-xs text-ink dark:text-white">
-                Craft your hero message! Tell the quest masters why you're the perfect candidate for this mission.
+                Craft your hero message! Tell the quest masters why you&apos;re the perfect candidate for this mission.
               </p>
             </div>
             
@@ -230,7 +230,7 @@ export default function OpportunitiesPage() {
                 value={applicationMessage}
                 onChange={(e) => setApplicationMessage(e.target.value)}
                 className="w-full clip-px border-px border-electric-teal bg-dark-surface/20 text-white font-body text-sm p-3 min-h-[120px] resize-none"
-                placeholder="Tell them about your passion, relevant experience, and why you're excited about this opportunity..."
+                placeholder="Tell them about your passion, relevant experience, and why you&apos;re excited about this opportunity..."
                 maxLength={500}
               />
               <p className="text-xs text-gray-400">

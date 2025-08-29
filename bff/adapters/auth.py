@@ -21,6 +21,14 @@ class AuthAdapter:
     async def register_user(self, email: str, password: str, name: str, role: str) -> Dict[str, Any]:
         """Register a new user"""
         try:
+            # Map role to the expected enum value
+            role_mapping = {
+                "volunteer": "VOLUNTEER",
+                "org_admin": "ORG_ADMIN", 
+                "superadmin": "SUPERADMIN"
+            }
+            mapped_role = role_mapping.get(role.lower(), "VOLUNTEER")
+            
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.post(
                     f"{self.auth_service_url}/auth/register",
@@ -28,7 +36,7 @@ class AuthAdapter:
                         "email": email,
                         "password": password,
                         "name": name,
-                        "role": role
+                        "role": mapped_role
                     }
                 )
                 
@@ -39,7 +47,8 @@ class AuthAdapter:
                 elif response.status_code == 400:
                     raise HTTPException(status_code=400, detail="Invalid request data")
                 else:
-                    raise HTTPException(status_code=response.status_code, detail="Registration failed")
+                    print(f"[DEBUG] Auth service registration failed with status {response.status_code}: {response.text}")
+                    raise HTTPException(status_code=response.status_code, detail=f"Registration failed: {response.text}")
                     
         except httpx.RequestError as e:
             raise HTTPException(status_code=503, detail=f"Auth service unavailable: {str(e)}")

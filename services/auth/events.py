@@ -5,6 +5,7 @@ import os
 import json
 import logging
 from datetime import datetime
+from uuid import uuid4
 from typing import Dict, Any
 from pathlib import Path
 
@@ -40,8 +41,10 @@ class AuthEventPublisher:
     async def publish(self, event_type: str, data: Dict[str, Any]):
         """Publish an authentication event to both file and Redis"""
         event = {
+            "eventId": str(uuid4()),
             "eventType": event_type,
             "timestamp": datetime.utcnow().isoformat(),
+            "organizationId": data.get("organizationId"),
             "data": data
         }
         

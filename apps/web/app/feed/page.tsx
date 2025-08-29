@@ -1,14 +1,13 @@
 'use client';
 
 import { PxButton, PxCard } from '@seraaj/ui';
-import { VolunteerApi } from '@seraaj/sdk-bff';
+// Removed direct VolunteerApi import - using bff client instead
 
 export default function FeedPage() {
   const handleQuickMatch = async () => {
     try {
-      // Example of using the SDK - this proves types are wired without making network assumptions
-      const volunteerApi = new VolunteerApi();
-      console.log('VolunteerApi instance created:', volunteerApi);
+      // Example of using the SDK through the configured client
+      console.log('Quick match functionality available through OpportunitiesContext');
       // Note: Not actually calling the API here to avoid network dependencies
     } catch (error) {
       console.error('Error with volunteer API:', error);
@@ -42,7 +41,7 @@ export default function FeedPage() {
               </h3>
             </div>
             <p className="text-sm text-ink dark:text-white mb-3">
-              🌿 Battle the weeds and restore nature's harmony this weekend!
+              🌿 Battle the weeds and restore nature&apos;s harmony this weekend!
             </p>
             <div className="flex gap-2">
               <PxButton variant="secondary" size="sm">

@@ -16,6 +16,30 @@ class ApplicationState(str, Enum):
     COMPLETED = "completed"
     CANCELLED = "cancelled"
 
+    def to_external_status(self) -> str:
+        """Map internal state to external contract value"""
+        mapping = {
+            ApplicationState.DRAFT: "pending",
+            ApplicationState.SUBMITTED: "pending",
+            ApplicationState.REVIEWING: "pending",
+            ApplicationState.ACCEPTED: "approved",
+            ApplicationState.REJECTED: "rejected",
+            ApplicationState.COMPLETED: "approved",
+            ApplicationState.CANCELLED: "withdrawn",
+        }
+        return mapping[self]
+
+    @classmethod
+    def from_external_status(cls, external_status: str) -> 'ApplicationState':
+        """Map external contract value to internal state"""
+        mapping = {
+            "pending": cls.SUBMITTED,
+            "approved": cls.ACCEPTED,
+            "rejected": cls.REJECTED,
+            "withdrawn": cls.CANCELLED,
+        }
+        return mapping.get(str(external_status).lower(), cls.SUBMITTED)
+
 
 class ApplicationStateMachine:
     """State machine for application lifecycle"""

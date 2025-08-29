@@ -13,7 +13,7 @@ class MatchingAdapter:
         self.base_url = base_url.rstrip('/')
         self.timeout = 30.0
     
-    async def quick_match(self, volunteer_id: str, limit: int = 10) -> List[Dict[str, Any]]:
+    async def quick_match(self, volunteer_id: str, limit: int = 10, authorization: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Get quick match suggestions from Matching service
         Maps BFF request to Matching service format
@@ -25,7 +25,8 @@ class MatchingAdapter:
                     params={
                         "volunteer_id": volunteer_id,
                         "limit": limit
-                    }
+                    },
+                    headers=({"Authorization": authorization} if authorization else None)
                 )
                 
                 if response.status_code == 200:
@@ -45,14 +46,15 @@ class MatchingAdapter:
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Internal error calling matching service: {str(e)}")
     
-    async def get_suggestions(self, volunteer_id: str) -> List[Dict[str, Any]]:
+    async def get_suggestions(self, volunteer_id: str, authorization: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Get existing suggestions for a volunteer from Matching service
         """
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(
-                    f"{self.base_url}/suggestions/{volunteer_id}"
+                    f"{self.base_url}/suggestions/{volunteer_id}",
+                    headers=({"Authorization": authorization} if authorization else None)
                 )
                 
                 if response.status_code == 200:

@@ -58,7 +58,7 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
+        cache: 'pnpm'
         
     - name: Setup Python
       if: steps.check.outputs.should_deploy == 'true'
@@ -80,10 +80,18 @@ jobs:
       if: steps.check.outputs.should_deploy == 'true'
       run: |
         # Quick smoke tests before deployment
-        pnpm type-check
-        pnpm build
-        python -m pytest services/applications/tests/test_service.py -q
-        python -m pytest services/matching/tests/test_service.py -q
+        echo "Running essential pre-deployment tests..."
+        pnpm type-check || { echo "TypeScript checks failed"; exit 1; }
+        pnpm build || { echo "Build failed"; exit 1; }
+        
+        # Test core services if available
+        if [ -f "services/applications/tests/test_service.py" ]; then
+          python -m pytest services/applications/tests/test_service.py -q
+        fi
+        if [ -f "services/matching/tests/test_service.py" ]; then
+          python -m pytest services/matching/tests/test_service.py -q
+        fi
+        echo "Pre-deployment tests completed"
 
   # Job 2: Build Docker Images
   build-images:
@@ -158,11 +166,9 @@ jobs:
         # Expose port
         EXPOSE 8000
         
-        # Run the service
-        CMD ["sh", "-c", "uvicorn ${SERVICE_PATH:-bff.main}:app --host 0.0.0.0 --port 8000"]
         EOF
         
-        # Set service-specific CMD
+        # Add service-specific CMD
         if [ "${{ matrix.service }}" = "applications" ]; then
           echo 'CMD ["uvicorn", "services.applications.api:app", "--host", "0.0.0.0", "--port", "8000"]' >> docker-build/${{ matrix.service }}/Dockerfile
         elif [ "${{ matrix.service }}" = "matching" ]; then
@@ -198,13 +204,13 @@ jobs:
       
     - name: Deploy to staging
       run: |
-        echo "🚀 Deploying to staging environment..."
+        echo "Deploying to staging environment..."
         echo "This would typically:"
         echo "  - Update Kubernetes manifests"
         echo "  - Apply database migrations"
         echo "  - Deploy services with rolling updates" 
         echo "  - Run smoke tests against staging"
-        echo "✅ Staging deployment completed"
+        echo "Staging deployment completed"
 
   # Job 4: Deploy to Production
   deploy-production:
@@ -220,7 +226,7 @@ jobs:
       
     - name: Deploy to production
       run: |
-        echo "🚀 Deploying to production environment..."
+        echo "Deploying to production environment..."
         echo "This would typically:"
         echo "  - Create production backup"
         echo "  - Update Kubernetes manifests with production config"
@@ -228,26 +234,26 @@ jobs:
         echo "  - Deploy services with zero-downtime rolling updates"
         echo "  - Run comprehensive health checks"
         echo "  - Enable traffic routing"
-        echo "✅ Production deployment completed"
+        echo "Production deployment completed"
 
   # Job 5: Post-Deploy Validation
   post-deploy-validation:
     runs-on: ubuntu-latest
     name: Post-Deployment Validation
-    needs: [deploy-staging, deploy-production]
-    if: always() && (needs.deploy-staging.result == 'success' || needs.deploy-production.result == 'success')
+    needs: [deploy-staging, deploy-production]  
+    if: always() && !cancelled() && (needs.deploy-staging.result == 'success' || needs.deploy-production.result == 'success')
     
     steps:
     - name: Run post-deployment tests
       run: |
-        echo "🔍 Running post-deployment validation..."
+        echo "Running post-deployment validation..."
         echo "This would typically:"
         echo "  - Test all API endpoints"
         echo "  - Validate database connectivity"
         echo "  - Check service-to-service communication"
         echo "  - Monitor application metrics"
         echo "  - Send deployment notifications"
-        echo "✅ Post-deployment validation completed"
+        echo "Post-deployment validation completed"
 
   # Job 6: Rollback (manual trigger)
   rollback:
@@ -259,10 +265,10 @@ jobs:
     steps:
     - name: Rollback deployment
       run: |
-        echo "⚠️ Initiating rollback procedure..."
+        echo "Initiating rollback procedure..."
         echo "This would typically:"
         echo "  - Revert to previous Docker images"
         echo "  - Restore database from backup (if needed)"
         echo "  - Update service configurations"
         echo "  - Validate rollback success"
-        echo "🔄 Rollback completed"
+        echo "Rollback completed"

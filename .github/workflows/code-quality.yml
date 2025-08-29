@@ -86,59 +86,59 @@ jobs:
         # Show high severity issues
         if [ -f bandit-report.json ]; then
           python -c "
-import json
-with open('bandit-report.json', 'r') as f:
-    report = json.load(f)
-    high_issues = [issue for issue in report.get('results', []) if issue.get('issue_severity') == 'HIGH']
-    if high_issues:
-        print('⚠️ High severity security issues found:')
-        for issue in high_issues[:3]:
-            print(f'  - {issue.get(\"test_id\", \"Unknown\")}: {issue.get(\"issue_text\", \"\")}')
-        if len(high_issues) > 3:
-            print(f'  ... and {len(high_issues) - 3} more')
-    else:
-        print('✅ No high severity security issues found')
-"
-        fi
-        
-    - name: Python dependency security scan (safety)
-      run: |
-        echo "Running Python dependency security scan with safety..."
-        safety check --json --output safety-report.json || {
-          echo "⚠️ Vulnerable dependencies found (review safety-report.json)"
-        }
-        
-        # Show critical vulnerabilities
-        if [ -f safety-report.json ]; then
-          python -c "
-import json
-try:
-    with open('safety-report.json', 'r') as f:
-        report = json.load(f)
-    vulns = report if isinstance(report, list) else []
-    if vulns:
-        print('⚠️ Vulnerable dependencies found:')
-        for vuln in vulns[:3]:
-            pkg = vuln.get('package_name', 'Unknown')
-            spec = vuln.get('specs', [''])[0] 
-            print(f'  - {pkg} {spec}: {vuln.get(\"advisory\", \"\")[:100]}...')
-        if len(vulns) > 3:
-            print(f'  ... and {len(vulns) - 3} more')
-    else:
-        print('✅ No vulnerable dependencies found')
-except:
-    print('✅ Safety check completed')
-"
-        fi
-        
-    - name: Upload Python quality reports
-      if: always()
-      uses: actions/upload-artifact@v3
-      with:
-        name: python-quality-reports
-        path: |
-          bandit-report.json
-          safety-report.json
+        import json
+        with open('bandit-report.json', 'r') as f:
+            report = json.load(f)
+            high_issues = [issue for issue in report.get('results', []) if issue.get('issue_severity') == 'HIGH']
+            if high_issues:
+                print('⚠️ High severity security issues found:')
+                for issue in high_issues[:3]:
+                    print(f'  - {issue.get(\"test_id\", \"Unknown\")}: {issue.get(\"issue_text\", \"\")}')
+                if len(high_issues) > 3:
+                    print(f'  ... and {len(high_issues) - 3} more')
+            else:
+                print('✅ No high severity security issues found')
+        "
+                fi
+                
+            - name: Python dependency security scan (safety)
+              run: |
+                echo "Running Python dependency security scan with safety..."
+                safety check --json --output safety-report.json || {
+                  echo "⚠️ Vulnerable dependencies found (review safety-report.json)"
+                }
+                
+                # Show critical vulnerabilities
+                if [ -f safety-report.json ]; then
+                  python -c "
+        import json
+        try:
+            with open('safety-report.json', 'r') as f:
+                report = json.load(f)
+            vulns = report if isinstance(report, list) else []
+            if vulns:
+                print('⚠️ Vulnerable dependencies found:')
+                for vuln in vulns[:3]:
+                    pkg = vuln.get('package_name', 'Unknown')
+                    spec = vuln.get('specs', [''])[0] 
+                    print(f'  - {pkg} {spec}: {vuln.get(\"advisory\", \"\")[:100]}...')
+                if len(vulns) > 3:
+                    print(f'  ... and {len(vulns) - 3} more')
+            else:
+                print('✅ No vulnerable dependencies found')
+        except:
+            print('✅ Safety check completed')
+        "
+                fi
+                
+            - name: Upload Python quality reports
+              if: always()
+              uses: actions/upload-artifact@v3
+              with:
+                name: python-quality-reports
+                path: |
+                  bandit-report.json
+                  safety-report.json
 
   # Job 2: TypeScript/JavaScript Quality
   typescript-quality:
@@ -218,6 +218,8 @@ except:
         pnpm build || {
           echo "❌ Build failed"
           exit 1
+        }
+        echo "✅ Build successful"
         }
         echo "✅ Build successful"
 

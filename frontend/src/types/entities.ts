@@ -1,30 +1,46 @@
-// Generated TypeScript types from JSON schemas
-// This is a placeholder - legacy code generation path
+// Generated TypeScript types (fallback)
 
-export interface Application {
+
+export interface Application.Schema {
   id: string;
   volunteerId: string;
   opportunityId: string;
+  organizationId?: string;
   status: string;
-  createdAt: string;
   coverLetter?: string;
+  submittedAt?: string;
+  reviewedAt?: string;
+  createdAt: string;
+  updatedAt?: string;
 }
 
-export interface MatchSuggestion {
+
+export interface MatchSuggestion.Schema {
   id: string;
   volunteerId: string;
   opportunityId: string;
   organizationId: string;
   score: number;
-  generatedAt: string;
+  reasons?: string[];
+  opportunityTitle?: string;
+  organizationName?: string;
   status: string;
+  generatedAt: string;
+  expiresAt?: string;
 }
 
-export interface VolunteerProfileView {
+
+export interface VolunteerProfileView.Schema {
   id: string;
   email: string;
   firstName: string;
   lastName: string;
-  level: string;
+  level: number;
+  status?: string;
+  skills?: string[];
+  badges?: Record<string, any>[];
+  totalHours?: number;
+  completedApplications?: number;
   createdAt: string;
+  lastActive?: string;
 }

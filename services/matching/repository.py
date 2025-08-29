@@ -74,10 +74,18 @@ class MatchRepository:
         self._cache[suggestion.id] = suggestion
         self._save()
 
-        # Log to history
+        # Log to history as proper event
         try:
+            event = {
+                "eventId": str(uuid4()),
+                "eventType": "match.suggestion_generated",
+                "aggregateId": str(suggestion.id),
+                "organizationId": str(suggestion.organizationId) if getattr(suggestion, 'organizationId', None) else None,
+                "timestamp": (suggestion.generatedAt.isoformat() if getattr(suggestion, 'generatedAt', None) else datetime.utcnow().isoformat()),
+                "data": suggestion.model_dump()
+            }
             with open(self.history_file, "a") as f:
-                f.write(json.dumps(suggestion.model_dump(), default=str) + "\n")
+                f.write(json.dumps(event, default=str) + "\n")
         except Exception:
             # Don't fail the save if history logging fails
             pass

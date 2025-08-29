@@ -149,8 +149,8 @@ app.add_middleware(StructuredLoggingMiddleware, service_name="bff")
 # Setup optional OpenTelemetry
 setup_telemetry(app, "bff")
 
-# CORS Configuration
-CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:3000').split(',')
+# CORS Configuration - allow frontend on port 3001
+CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://localhost:3001').split(',')
 
 app.add_middleware(
     CORSMiddleware,
@@ -191,40 +191,105 @@ class RefreshTokenRequest(BaseModel):
 
 # Mock data generators for contract-accurate responses
 def generate_mock_match_suggestion(volunteer_id: str, index: int = 0) -> Dict[str, Any]:
-    """Generate a mock match suggestion that matches the schema"""
-    base_time = datetime.utcnow()
+    """Generate a mock match suggestion that matches the contract schema"""
+    opportunities = [
+        {
+            "title": "Community Education Program",
+            "description": "Help teach basic literacy skills to adults in the community center. Work with diverse groups of learners in a supportive environment.",
+            "requiredSkills": ["teaching", "communication", "patience"],
+            "location": "Downtown Community Center, 123 Main St",
+            "timeCommitment": "4 hours per week, evenings"
+        },
+        {
+            "title": "Environmental Cleanup Initiative",
+            "description": "Join our monthly park cleanup and tree planting activities. Help preserve local green spaces for future generations.",
+            "requiredSkills": ["physical", "environmental", "teamwork"],
+            "location": "Central Park, North Entrance",
+            "timeCommitment": "6 hours per month, weekends"
+        },
+        {
+            "title": "Senior Care Support",
+            "description": "Provide companionship and assistance to elderly residents. Activities include reading, games, and light assistance.",
+            "requiredSkills": ["social", "caregiving", "empathy"],
+            "location": "Sunset Senior Home, 456 Oak Ave",
+            "timeCommitment": "3 hours per week, flexible"
+        }
+    ]
+    opp = opportunities[index % len(opportunities)]
     return {
-        "id": f"match-{volunteer_id}-{index:03d}",
-        "volunteerId": volunteer_id,
-        "opportunityId": f"opp-{index:03d}",
-        "organizationId": f"org-{index:03d}",
-        "score": 85.5 + (index * 2),
-        "reasons": [
-            "Skills match opportunity requirements",
-            "Location preference aligns",
-            "Available during required time slots"
-        ],
-        "opportunityTitle": f"Community Education Program {index + 1}",
+        "id": f"550e8400-e29b-41d4-a716-{446655440000 + index:012d}",  # Valid UUID format
+        "title": opp["title"],
+        "description": opp["description"],
         "organizationName": f"Hope Foundation {index + 1}",
-        "status": "active",
-        "generatedAt": base_time.isoformat(),
-        "expiresAt": base_time.replace(day=min(28, base_time.day + 7)).isoformat()
+        "requiredSkills": opp["requiredSkills"],
+        "location": opp["location"],
+        "timeCommitment": opp["timeCommitment"],
+        "matchScore": min(95, 85.5 + (index * 2))
+    }
+
+def _to_contract_match_suggestion(raw: Dict[str, Any], index: int = 0) -> Dict[str, Any]:
+    """Map internal/legacy match suggestion to contract-compliant shape"""
+    title = raw.get("title") or raw.get("opportunityTitle") or f"Opportunity {index + 1}"
+    description = raw.get("description") or " ".join(raw.get("reasons", [])) or "Suggested opportunity"
+    organization_name = raw.get("organizationName") or "Unknown Organization"
+    required_skills = raw.get("requiredSkills") or raw.get("reasons") or []
+    location = raw.get("location") or "Remote"
+    time_commitment = raw.get("timeCommitment") or "Flexible"
+    # Prefer explicit matchScore, fall back to score
+    match_score = raw.get("matchScore") if isinstance(raw.get("matchScore"), (int, float)) else raw.get("score", 0)
+    # Ensure result is within 0..100
+    try:
+        match_score = max(0, min(100, float(match_score)))
+    except Exception:
+        match_score = 0
+
+    return {
+        "id": str(raw.get("id")) if raw.get("id") else f"550e8400-e29b-41d4-a716-{446655440000 + index:012d}",
+        "title": title,
+        "description": description,
+        "organizationName": organization_name,
+        "requiredSkills": required_skills,
+        "location": location,
+        "timeCommitment": time_commitment,
+        "matchScore": match_score,
     }
 
 
+# Helpers to map internal models to contract schemas
+def _to_contract_application(raw: Dict[str, Any]) -> Dict[str, Any]:
+    status_map = {
+        "draft": "pending",
+        "submitted": "pending",
+        "reviewing": "pending",
+        "accepted": "approved",
+        "completed": "approved",
+        "rejected": "rejected",
+        "cancelled": "withdrawn",
+    }
+    status_value = str(raw.get("status", "")).lower()
+    return {
+        "id": str(raw.get("id")),
+        "volunteerId": str(raw.get("volunteerId")),
+        "opportunityId": str(raw.get("opportunityId")),
+        "status": status_map.get(status_value, "pending"),
+        "message": raw.get("coverLetter") or "",
+        "appliedAt": (raw.get("submittedAt") or raw.get("createdAt") or datetime.utcnow()).isoformat(),
+        "reviewedAt": raw.get("reviewedAt") or None,
+        "reviewerNotes": None,
+    }
+
 def generate_mock_application(volunteer_id: str, index: int = 0) -> Dict[str, Any]:
-    """Generate a mock application that matches the schema"""
+    """Generate a mock application that matches the contract schema"""
     base_time = datetime.utcnow()
     return {
-        "id": f"app-{volunteer_id}-{index:03d}",
+        "id": f"550e8400-e29b-41d4-a716-{556677880000 + index:012d}",
         "volunteerId": volunteer_id,
-        "opportunityId": f"opp-{index:03d}",
-        "organizationId": f"org-{index:03d}",
-        "status": "submitted",
-        "coverLetter": f"I am very interested in this opportunity because...",
-        "submittedAt": base_time.isoformat(),
-        "createdAt": base_time.isoformat(),
-        "updatedAt": base_time.isoformat()
+        "opportunityId": f"660e8400-e29b-41d4-a716-{112233440000 + index:012d}",
+        "status": "pending",
+        "message": "I am very interested in this opportunity because...",
+        "appliedAt": base_time.isoformat(),
+        "reviewedAt": None,
+        "reviewerNotes": None,
     }
 
 
@@ -517,8 +582,14 @@ async def get_quick_match(request: QuickMatchRequest, req: Request):
     )
     
     try:
-        # Call matching service
-        matches = await matching_adapter.quick_match(request.volunteerId, request.limit)
+        # Call matching service (forward Authorization if present)
+        auth_header = req.headers.get('Authorization')
+        raw_matches = await matching_adapter.quick_match(request.volunteerId, request.limit, authorization=auth_header)
+        # Map to contract-compliant schema
+        matches = [
+            _to_contract_match_suggestion(m, i)
+            for i, m in enumerate(raw_matches)
+        ]
         
         duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
         
@@ -603,11 +674,13 @@ async def submit_application(request: SubmitApplicationRequest, req: Request):
     )
     
     try:
-        # Call applications service
+        # Call applications service (forward Authorization if present)
+        auth_header = req.headers.get('Authorization')
         application = await applications_adapter.submit_application(
             request.volunteerId, 
             request.opportunityId, 
-            request.coverLetter
+            request.coverLetter,
+            authorization=auth_header
         )
         
         duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
@@ -674,16 +747,19 @@ async def get_volunteer_dashboard(volunteer_id: str, req: Request):
         # In production, these would be done in parallel
         
         # Get applications from applications service
-        applications = await applications_adapter.get_volunteer_applications(volunteer_id)
+        auth_header = req.headers.get('Authorization')
+        applications = await applications_adapter.get_volunteer_applications(volunteer_id, authorization=auth_header)
         
-        # Filter for active applications (not in final states)
-        active_applications = [
+        # Filter for active applications (not in final states) and map to contract schema
+        active_applications_internal = [
             app for app in applications 
             if app.get('status') not in ['completed', 'cancelled', 'rejected']
         ]
+        active_applications = [_to_contract_application(app) for app in active_applications_internal]
         
-        # Get recent matches from matching service
-        recent_matches = await matching_adapter.get_suggestions(volunteer_id)
+        # Get recent matches from matching service and map to contract schema
+        recent_matches_raw = await matching_adapter.get_suggestions(volunteer_id, authorization=auth_header)
+        recent_matches = [_to_contract_match_suggestion(m, i) for i, m in enumerate(recent_matches_raw)]
         
         # Generate profile data (mock for now - would come from volunteer service in production)
         profile = generate_mock_volunteer_profile(volunteer_id)

@@ -13,7 +13,7 @@ import { VolunteerDashboardResponse } from '@seraaj/sdk-bff';
 export default function DashboardPage() {
   const { user, tokens } = useAuth();
   const { opportunities, isLoading: opportunitiesLoading, loadQuickMatches, applyToOpportunity, isApplying } = useOpportunities();
-  const { showSuccess, showError } = useToast();
+  const { showError } = useToast();
   const [dashboard, setDashboard] = useState<VolunteerDashboardResponse | null>(null);
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(true);
   const [selectedOpportunityId, setSelectedOpportunityId] = useState<string | null>(null);
@@ -145,7 +145,7 @@ export default function DashboardPage() {
                           {app.status === 'pending' ? '⏳' : app.status === 'approved' ? '✅' : '❌'} {app.status.toUpperCase()}
                         </PxChip>
                         <p className="text-ink dark:text-white text-xs">
-                          📅 Applied: {new Date(app.appliedAt).toLocaleDateString()}
+                          📅 Applied: {new Date(app.submittedAt).toLocaleDateString()}
                         </p>
                       </div>
                     ))}

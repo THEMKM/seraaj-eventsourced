@@ -96,7 +96,7 @@ class ApplicationRepository:
                 data.append(app_dict)
             
             with open(self.data_file, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
+                json.dump(data, f, indent=2, ensure_ascii=False, default=str)
                 
             print(f"[INFO] Saved {len(data)} applications to file storage")
         except Exception as e:

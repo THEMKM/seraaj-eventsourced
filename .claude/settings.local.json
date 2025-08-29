@@ -74,7 +74,21 @@
       "Bash(pnpm --filter @seraaj/web test)",
       "Bash(pnpm lint:*)",
       "Bash(NEXT_PUBLIC_BFF_URL=http://localhost:8000/api timeout 15 pnpm dev)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(NEXT_PUBLIC_BFF_URL=http://localhost:8000/api timeout 30 pnpm dev)",
+      "Bash(NEXT_PUBLIC_BFF_URL=http://localhost:8000/api pnpm dev)",
+      "Bash(pnpm validate:schemas:*)",
+      "Bash(yamllint:*)",
+      "Bash(gh issue create:*)",
+      "Bash(gh issue edit:*)",
+      "Bash(gh issue list:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh issue close:*)",
+      "Bash(sed:*)",
+      "Bash(pip show:*)",
+      "WebSearch",
+      "WebSearch",
+      "Bash(pip freeze)"
     ],
     "deny": []
   }
