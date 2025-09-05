@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from services.shared.models import MatchSuggestion
+from infrastructure.sequence import SequenceStore
 
 class MatchRepository:
     """Repository for match suggestions (dual backend scaffold)"""
@@ -43,6 +44,7 @@ class MatchRepository:
         self.data_file = self.data_dir / "match_suggestions.json"
         self.history_file = self.data_dir / "match_history.jsonl"
         self._cache: Dict[str, MatchSuggestion] = {}
+        self._seq = SequenceStore(data_dir)
         self._load()
     
     def _load(self):
@@ -52,9 +54,19 @@ class MatchRepository:
                 with open(self.data_file) as f:
                     data = json.load(f)
                     for item in data:
+                        # Coerce legacy/invalid fields for compatibility
+                        status = item.get('status')
+                        if isinstance(status, str) and '.' in status:
+                            # e.g., "MatchSuggestionStatus.active" -> "active"
+                            item['status'] = status.split('.')[-1]
+                        # Normalize datetime format
+                        if isinstance(item.get('generatedAt'), str) and ' ' in item['generatedAt']:
+                            item['generatedAt'] = item['generatedAt'].replace(' ', 'T')
+                        if isinstance(item.get('expiresAt'), str) and ' ' in item['expiresAt']:
+                            item['expiresAt'] = item['expiresAt'].replace(' ', 'T')
                         suggestion = MatchSuggestion(**item)
                         self._cache[suggestion.id] = suggestion
-            except (json.JSONDecodeError, TypeError, KeyError):
+            except (json.JSONDecodeError, TypeError, KeyError, Exception):
                 # Handle corrupted data gracefully
                 pass
     
@@ -82,10 +94,17 @@ class MatchRepository:
                 "aggregateId": str(suggestion.id),
                 "organizationId": str(suggestion.organizationId) if getattr(suggestion, 'organizationId', None) else None,
                 "timestamp": (suggestion.generatedAt.isoformat() if getattr(suggestion, 'generatedAt', None) else datetime.utcnow().isoformat()),
+                "sequence": self._seq.next("matching"),
                 "data": suggestion.model_dump()
             }
+            line = json.dumps(event, default=str) + "\n"
             with open(self.history_file, "a") as f:
-                f.write(json.dumps(event, default=str) + "\n")
+                f.write(line)
+            if os.getenv("EVENT_MIRROR_GZ", "false").lower() == "true":
+                gz_path = str(self.history_file) + ".gz"
+                import gzip
+                with gzip.open(gz_path, "ab") as gf:
+                    gf.write(line.encode("utf-8"))
         except Exception:
             # Don't fail the save if history logging fails
             pass

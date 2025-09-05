@@ -129,7 +129,26 @@ export class BaseClient {
     
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ message: response.statusText }));
-      throw new Error(errorData.message || errorData.detail || `HTTP ${response.status}`);
+      
+      // Create enhanced error with full context
+      const error = new Error(errorData.message || errorData.detail || `HTTP ${response.status}`);
+      // Attach extra context for richer error handling in callers
+      const errAny: any = error;
+      errAny.status = response.status;
+      errAny.statusText = response.statusText;
+      errAny.data = errorData;
+      
+      // Handle detailed validation errors
+      if (Array.isArray(errorData.detail)) {
+        const fieldErrors = errorData.detail.map((detail: any) => {
+          const field = detail.loc?.[1] || 'field';
+          const msg = detail.msg || 'Invalid value';
+          return `${field}: ${msg}`;
+        });
+        error.message = `Validation failed: ${fieldErrors.join(', ')}`;
+      }
+      
+      throw error;
     }
     
     return response.json();
@@ -162,6 +181,12 @@ export class AuthApi extends BaseClient {
   
   async getCurrentUser(): Promise<User> {
     return this.request<User>('GET', '/auth/me');
+  }
+
+  // Temporary insecure reset; returns { status: 'ok' }
+  // TODO(security): Replace with token-based reset flow
+  async resetPassword(data: { email: string; newPassword: string; }): Promise<{ status: string; userId?: string }> {
+    return this.request<{ status: string; userId?: string }>('POST', '/auth/reset-password', data);
   }
 }
 

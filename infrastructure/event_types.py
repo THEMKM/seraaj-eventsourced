@@ -90,6 +90,9 @@ class EventTypes:
         ]
 
 
+from jsonschema import validate as _js_validate, ValidationError as _JSValidationError
+
+
 class EventSchemas:
     """Event payload schemas for validation (optional)"""
     
@@ -99,7 +102,7 @@ class EventSchemas:
         "properties": {
             "applicationId": {"type": "string"},
             "volunteerId": {"type": "string"},
-            "organizationId": {"type": "string"},
+            "organizationId": {"type": ["string", "null"]},
             "opportunityId": {"type": "string"},
             "submittedAt": {"type": "string", "format": "date-time"}
         }
@@ -115,7 +118,7 @@ class EventSchemas:
             "generatedAt": {"type": "string", "format": "date-time"}
         }
     }
-    
+
     USER_REGISTERED = {
         "type": "object",
         "required": ["userId", "email", "role"],
@@ -123,7 +126,93 @@ class EventSchemas:
             "userId": {"type": "string"},
             "email": {"type": "string", "format": "email"},
             "name": {"type": "string"},
-            "role": {"type": "string", "enum": ["volunteer", "organization", "admin"]},
+            "role": {"type": "string", "enum": ["VOLUNTEER", "ORG_ADMIN", "SUPERADMIN"]},
             "registeredAt": {"type": "string", "format": "date-time"}
         }
     }
+
+    APPLICATION_CREATED = {
+        "type": "object",
+        "required": ["applicationId", "volunteerId", "opportunityId"],
+        "properties": {
+            "applicationId": {"type": "string"},
+            "volunteerId": {"type": "string"},
+            "opportunityId": {"type": "string"},
+            "createdAt": {"type": "string", "format": "date-time"}
+        }
+    }
+
+    APPLICATION_STATE_CHANGED = {
+        "type": "object",
+        "required": ["applicationId", "oldState", "newState"],
+        "properties": {
+            "applicationId": {"type": "string"},
+            "oldState": {"type": "string"},
+            "newState": {"type": "string"},
+            "changedAt": {"type": "string", "format": "date-time"}
+        }
+    }
+
+    APPLICATION_COMPLETED = {
+        "type": "object",
+        "required": ["applicationId", "volunteerId"],
+        "properties": {
+            "applicationId": {"type": "string"},
+            "volunteerId": {"type": "string"},
+            "completedAt": {"type": "string", "format": "date-time"}
+        }
+    }
+
+    USER_LOGIN = {
+        "type": "object",
+        "required": ["userId", "email", "loginAt"],
+        "properties": {
+            "userId": {"type": "string"},
+            "email": {"type": "string", "format": "email"},
+            "loginAt": {"type": "string", "format": "date-time"}
+        }
+    }
+
+    USER_PASSWORD_CHANGED = {
+        "type": "object",
+        "required": ["userId", "changedAt"],
+        "properties": {
+            "userId": {"type": "string"},
+            "changedAt": {"type": "string", "format": "date-time"}
+        }
+    }
+
+    MATCH_SUGGESTION_APPLIED = {
+        "type": "object",
+        "required": ["suggestionId", "volunteerId", "opportunityId", "appliedAt"],
+        "properties": {
+            "suggestionId": {"type": "string"},
+            "volunteerId": {"type": "string"},
+            "opportunityId": {"type": "string"},
+            "appliedAt": {"type": "string", "format": "date-time"}
+        }
+    }
+
+    _SCHEMA_MAP = {
+        EventTypes.APPLICATION_CREATED: APPLICATION_CREATED,
+        EventTypes.APPLICATION_SUBMITTED: APPLICATION_SUBMITTED,
+        EventTypes.APPLICATION_STATE_CHANGED: APPLICATION_STATE_CHANGED,
+        EventTypes.APPLICATION_COMPLETED: APPLICATION_COMPLETED,
+        EventTypes.MATCH_SUGGESTIONS_GENERATED: MATCH_SUGGESTIONS_GENERATED,
+        EventTypes.MATCH_SUGGESTION_APPLIED: MATCH_SUGGESTION_APPLIED,
+        EventTypes.USER_REGISTERED: USER_REGISTERED,
+        EventTypes.USER_LOGIN: USER_LOGIN,
+        EventTypes.USER_PASSWORD_CHANGED: USER_PASSWORD_CHANGED,
+    }
+
+    @classmethod
+    def get_schema_for_type(cls, event_type: str) -> dict | None:
+        return cls._SCHEMA_MAP.get(event_type)
+
+    @classmethod
+    def validate_payload(cls, event_type: str, payload: dict) -> None:
+        schema = cls.get_schema_for_type(event_type)
+        if not schema:
+            # If no schema, consider it unknown; raise to enforce defined types only
+            raise _JSValidationError(f"No schema defined for event type: {event_type}")
+        _js_validate(payload, schema)

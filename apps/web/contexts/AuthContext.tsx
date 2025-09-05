@@ -95,11 +95,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Token will be retrieved dynamically from localStorage by other API clients
   };
 
+  // Helper function to extract detailed error information from API responses
+  const parseApiError = (error: any): string => {
+    // Check for network/connection issues first
+    if (!navigator.onLine) {
+      return 'No internet connection. Please check your network and try again.';
+    }
+
+    if (error?.message?.includes('fetch') || error?.code === 'NETWORK_ERROR') {
+      return 'Unable to connect to server. Please try again in a few moments.';
+    }
+
+    // Now we have enhanced error information from the updated SDK
+    const status = error?.status;
+    const errorMessage = error?.message || 'Request failed';
+    
+    // Handle specific HTTP status codes with meaningful messages
+    if (status === 401 || errorMessage === 'Invalid credentials') {
+      return 'Invalid email or password. Please check your credentials and try again.';
+    }
+    
+    if (status === 422) {
+      // Enhanced SDK now provides detailed validation messages
+      return errorMessage; // e.g., "Validation failed: password: String should have at least 8 characters"
+    }
+
+    if (status === 409) {
+      return 'An account with this email already exists. Please try logging in instead.';
+    }
+
+    if (status === 429) {
+      return 'Too many attempts. Please wait a few minutes before trying again.';
+    }
+
+    if (status >= 500) {
+      return 'Server error. Please try again in a few moments.';
+    }
+
+    // Return the actual server error message
+    return errorMessage;
+  };
+
   const login = async (email: string, password: string): Promise<void> => {
     try {
       setIsLoading(true);
       const response = await authApi.loginUser({ email, password });
       await updateAuthState(response.user, response.tokens);
+    } catch (error: any) {
+      setIsLoading(false);
+      
+      const errorMessage = parseApiError(error);
+      
+      // Create a more informative error object
+      const enhancedError = new Error(errorMessage);
+      (enhancedError as any).cause = error;
+      throw enhancedError;
     } finally {
       setIsLoading(false);
     }
@@ -115,6 +165,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       const response = await authApi.registerUser({ name, email, password, role });
       await updateAuthState(response.user, response.tokens);
+    } catch (error: any) {
+      setIsLoading(false);
+      
+      const errorMessage = parseApiError(error);
+      
+      // Create a more informative error object
+      const enhancedError = new Error(errorMessage);
+      (enhancedError as any).cause = error;
+      throw enhancedError;
     } finally {
       setIsLoading(false);
     }

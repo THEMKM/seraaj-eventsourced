@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Query, Request, Header, Depends
 import os
 import jwt
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 from services.shared.models import MatchSuggestion
 from services.shared.logging_config import (
@@ -54,7 +54,7 @@ async def quick_match(
 ):
     """Generate quick match suggestions (top matches)"""
     trace_id = get_trace_id(request) if request else None
-    start_time = datetime.utcnow()
+    start_time = datetime.now(UTC)
     
     log_structured(
         logger, "INFO", "Quick match requested",
@@ -80,7 +80,7 @@ async def quick_match(
                 detail="No suitable matches found for this volunteer"
             )
         
-        duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+        duration_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
         avg_score = sum(s.score for s in suggestions) / len(suggestions) if suggestions else 0
         
         log_structured(
@@ -132,7 +132,7 @@ async def generate_matches(
 ):
     """Generate comprehensive match suggestions"""
     trace_id = get_trace_id(request) if request else None
-    start_time = datetime.utcnow()
+    start_time = datetime.now(UTC)
     
     filters = {}
     if category:
@@ -150,7 +150,7 @@ async def generate_matches(
     try:
         suggestions = await service.generate_matches(volunteer_id, filters, limit)
         
-        duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+        duration_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
         avg_score = sum(s.score for s in suggestions) / len(suggestions) if suggestions else 0
         
         log_structured(
@@ -234,7 +234,7 @@ async def health_check():
     return {
         "status": "healthy", 
         "service": "matching",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "version": "1.0.0"
     }
 
@@ -244,7 +244,7 @@ async def liveness_check():
     """Kubernetes liveness probe - is the service running?"""
     return {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "service": "matching",
         "version": "1.0.0"
     }
@@ -266,10 +266,14 @@ async def readiness_check():
     
     return {
         "status": "healthy" if overall_healthy else "unhealthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "checks": checks
     }
 
 if __name__ == "__main__":
+    from services.shared.port_config import get_service_startup_config
+    
+    host, port = get_service_startup_config("matching")
+    print(f"Starting Matching service on {host}:{port}")
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8003)
+    uvicorn.run(app, host=host, port=port)

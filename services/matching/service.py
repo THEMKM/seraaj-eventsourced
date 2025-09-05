@@ -68,7 +68,7 @@ class MatchingService:
                 scoreComponents=score.components,
                 explanation=score.explanation,
                 generatedAt=datetime.now(UTC),
-                status="pending"
+                status="active"
             )
             
             # Save to repository
@@ -108,7 +108,7 @@ class MatchingService:
                 scoreComponents=score.components,
                 explanation=score.explanation,
                 generatedAt=datetime.now(UTC),
-                status="pending"
+                status="active"
             )
             await self.repository.save(suggestion)
             suggestions.append(suggestion)
@@ -161,8 +161,8 @@ class MatchingService:
         """Get available opportunities (mock for MVP)"""
         opportunities = [
             {
-                "id": "opp1",
-                "organizationId": "org1",
+                "id": "550e8400-e29b-41d4-a716-446655440001",
+                "organizationId": "660e8400-e29b-41d4-a716-446655440001",
                 "title": "Teaching Assistant - Mathematics",
                 "description": "Help students with math homework",
                 "requiredSkills": ["teaching", "communication"],
@@ -171,8 +171,8 @@ class MatchingService:
                 "category": "education"
             },
             {
-                "id": "opp2",
-                "organizationId": "org2",
+                "id": "550e8400-e29b-41d4-a716-446655440002",
+                "organizationId": "660e8400-e29b-41d4-a716-446655440002",
                 "title": "Medical Volunteer",
                 "description": "Assist in health clinic",
                 "requiredSkills": ["medical"],
@@ -181,8 +181,8 @@ class MatchingService:
                 "category": "health"
             },
             {
-                "id": "opp3",
-                "organizationId": "org1",
+                "id": "550e8400-e29b-41d4-a716-446655440003",
+                "organizationId": "660e8400-e29b-41d4-a716-446655440001",
                 "title": "Administrative Support",
                 "description": "Help with office tasks and organization",
                 "requiredSkills": ["administrative", "communication"],
@@ -191,8 +191,8 @@ class MatchingService:
                 "category": "administrative"
             },
             {
-                "id": "opp4",
-                "organizationId": "org3",
+                "id": "550e8400-e29b-41d4-a716-446655440004",
+                "organizationId": "660e8400-e29b-41d4-a716-446655440003",
                 "title": "Website Development",
                 "description": "Build website for NGO",
                 "requiredSkills": ["technical", "programming", "design"],
@@ -201,8 +201,8 @@ class MatchingService:
                 "category": "technology"
             },
             {
-                "id": "opp5",
-                "organizationId": "org2",
+                "id": "550e8400-e29b-41d4-a716-446655440005",
+                "organizationId": "660e8400-e29b-41d4-a716-446655440002",
                 "title": "Counseling Support",
                 "description": "Provide emotional support to patients",
                 "requiredSkills": ["counseling", "communication"],
@@ -211,8 +211,8 @@ class MatchingService:
                 "category": "health"
             },
             {
-                "id": "opp6",
-                "organizationId": "org4",
+                "id": "550e8400-e29b-41d4-a716-446655440006",
+                "organizationId": "660e8400-e29b-41d4-a716-446655440004",
                 "title": "General Volunteer",
                 "description": "Help with various tasks as needed",
                 "requiredSkills": [],  # No specific skills required

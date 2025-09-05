@@ -3,6 +3,7 @@ Auth domain event publisher
 """
 import os
 import json
+import gzip
 import logging
 from datetime import datetime
 from uuid import uuid4
@@ -17,6 +18,8 @@ except ImportError:
     REDIS_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
+from infrastructure.event_types import EventSchemas
+from infrastructure.sequence import SequenceStore
 
 
 class AuthEventPublisher:
@@ -26,7 +29,7 @@ class AuthEventPublisher:
         # File-based logging (for backward compatibility)
         self.event_log = Path("data/auth_domain_events.jsonl")
         self.event_log.parent.mkdir(exist_ok=True)
-        
+        self._seq = SequenceStore(self.event_log.parent.as_posix())
         # Redis event bus
         self.use_redis = os.getenv("USE_REDIS_EVENTS", "true").lower() == "true"
         self.redis_bus = None
@@ -45,12 +48,21 @@ class AuthEventPublisher:
             "eventType": event_type,
             "timestamp": datetime.utcnow().isoformat(),
             "organizationId": data.get("organizationId"),
+            "sequence": self._seq.next("auth"),
             "data": data
         }
         
+        # Validate payload
+        EventSchemas.validate_payload(event_type, data)
+
         # 1. File-based publishing (existing functionality)
+        line = json.dumps(event, default=str) + "\n"
         with open(self.event_log, "a") as f:
-            f.write(json.dumps(event, default=str) + "\n")
+            f.write(line)
+        if os.getenv("EVENT_MIRROR_GZ", "false").lower() == "true":
+            gz_path = str(self.event_log) + ".gz"
+            with gzip.open(gz_path, "ab") as gf:
+                gf.write(line.encode("utf-8"))
         
         # 2. Redis publishing (new functionality)
         redis_published = False

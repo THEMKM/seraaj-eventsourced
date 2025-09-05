@@ -6,8 +6,10 @@ from fastapi import HTTPException
 
 class AuthAdapter:
     def __init__(self, auth_service_url: str = "http://127.0.0.1:8004"):
+        import os
         self.auth_service_url = auth_service_url.rstrip('/')
-        self.timeout = httpx.Timeout(30.0)
+        default_timeout = float(os.getenv('AUTH_HTTP_TIMEOUT', os.getenv('BFF_HTTP_TIMEOUT', '30.0')))
+        self.timeout = httpx.Timeout(default_timeout)
 
     async def health_check(self) -> bool:
         """Check if auth service is healthy"""
@@ -112,5 +114,24 @@ class AuthAdapter:
                 else:
                     raise HTTPException(status_code=response.status_code, detail="Failed to get user profile")
                     
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=503, detail=f"Auth service unavailable: {str(e)}")
+
+    async def reset_password(self, email: str, new_password: str) -> Dict[str, Any]:
+        """Temporary: reset password without verification (MVP only)
+        TODO(security): Replace with token-based reset and email verification.
+        """
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.post(
+                    f"{self.auth_service_url}/auth/reset-password",
+                    json={"email": email, "newPassword": new_password}
+                )
+                if response.status_code == 200:
+                    return response.json()
+                elif response.status_code == 400:
+                    raise HTTPException(status_code=400, detail="Invalid reset request")
+                else:
+                    raise HTTPException(status_code=response.status_code, detail="Reset password failed")
         except httpx.RequestError as e:
             raise HTTPException(status_code=503, detail=f"Auth service unavailable: {str(e)}")

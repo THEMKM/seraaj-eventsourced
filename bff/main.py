@@ -5,7 +5,7 @@ Simplified Seraaj BFF API for testing schema validation
 import os
 import json
 import yaml
-from datetime import datetime
+from datetime import datetime, UTC
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -31,6 +31,7 @@ from services.shared.logging_config import (
     log_business_metric,
     log_performance_metric
 )
+from services.shared.models import StandardErrorResponse
 
 
 # Load OpenAPI schema for validation
@@ -189,6 +190,12 @@ class RefreshTokenRequest(BaseModel):
     refreshToken: str = Field(..., description="Valid refresh token")
 
 
+class ResetPasswordRequest(BaseModel):
+    # TODO(security): Replace with token-based reset and email verification.
+    email: str = Field(..., description="User's email address")
+    newPassword: str = Field(..., min_length=8, max_length=128, description="New password (minimum 8 characters)")
+
+
 # Mock data generators for contract-accurate responses
 def generate_mock_match_suggestion(volunteer_id: str, index: int = 0) -> Dict[str, Any]:
     """Generate a mock match suggestion that matches the contract schema"""
@@ -243,7 +250,8 @@ def _to_contract_match_suggestion(raw: Dict[str, Any], index: int = 0) -> Dict[s
     except Exception:
         match_score = 0
 
-    return {
+    # Contract-compliant core fields
+    result = {
         "id": str(raw.get("id")) if raw.get("id") else f"550e8400-e29b-41d4-a716-{446655440000 + index:012d}",
         "title": title,
         "description": description,
@@ -253,6 +261,15 @@ def _to_contract_match_suggestion(raw: Dict[str, Any], index: int = 0) -> Dict[s
         "timeCommitment": time_commitment,
         "matchScore": match_score,
     }
+    # Backward-compatibility extras (allowed by schema additionalProperties):
+    for extra_key in (
+        "volunteerId", "opportunityId", "organizationId",
+        "status", "generatedAt", "expiresAt",
+        "scoreComponents", "explanation",
+    ):
+        if extra_key in raw and raw.get(extra_key) is not None:
+            result[extra_key] = raw.get(extra_key)
+    return result
 
 
 # Helpers to map internal models to contract schemas
@@ -273,14 +290,14 @@ def _to_contract_application(raw: Dict[str, Any]) -> Dict[str, Any]:
         "opportunityId": str(raw.get("opportunityId")),
         "status": status_map.get(status_value, "pending"),
         "message": raw.get("coverLetter") or "",
-        "appliedAt": (raw.get("submittedAt") or raw.get("createdAt") or datetime.utcnow()).isoformat(),
+        "appliedAt": (raw.get("submittedAt") or raw.get("createdAt") or datetime.now(UTC)).isoformat(),
         "reviewedAt": raw.get("reviewedAt") or None,
         "reviewerNotes": None,
     }
 
 def generate_mock_application(volunteer_id: str, index: int = 0) -> Dict[str, Any]:
     """Generate a mock application that matches the contract schema"""
-    base_time = datetime.utcnow()
+    base_time = datetime.now(UTC)
     return {
         "id": f"550e8400-e29b-41d4-a716-{556677880000 + index:012d}",
         "volunteerId": volunteer_id,
@@ -295,7 +312,7 @@ def generate_mock_application(volunteer_id: str, index: int = 0) -> Dict[str, An
 
 def generate_mock_volunteer_profile(volunteer_id: str) -> Dict[str, Any]:
     """Generate a mock volunteer profile that matches the schema"""
-    base_time = datetime.utcnow()
+    base_time = datetime.now(UTC)
     return {
         "id": volunteer_id,
         "email": "volunteer@example.com",
@@ -323,15 +340,21 @@ def generate_mock_volunteer_profile(volunteer_id: str) -> Dict[str, Any]:
 # Health check endpoints
 @app.get("/api/health")
 async def health_check():
-    """Basic health check endpoint that returns service status"""
-    response_data = {
-        "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
-    "version": "1.1.0"
-    }
+    """Dependency-aware health check endpoint"""
+    health_result = await health_checker.check_health()
+    response_data = health_result.to_dict()
     
     # Validate against schema
-    validate_response_schema("/health", "get", 200, response_data)
+    try:
+        validate_response_schema("/health", "get", 200, response_data)
+    except Exception as e:
+        logger.warning(f"Health response schema validation failed: {e}")
+        # Return basic format if schema validation fails
+        return {
+            "status": health_result.overall_status.value,
+            "timestamp": health_result.timestamp,
+            "version": health_result.version
+        }
     
     return response_data
 
@@ -343,20 +366,38 @@ async def services_health_check():
     matching_healthy = await matching_adapter.health_check()
     auth_healthy = await auth_adapter.health_check()
     
-    overall_status = "healthy" if applications_healthy and matching_healthy and auth_healthy else "degraded"
+    # Use health checker for consistent status reporting
+    health_result = await health_checker.check_health(use_cache=False)
+    response_data = health_result.to_dict()
     
-    response_data = {
-        "status": overall_status,
-        "timestamp": datetime.utcnow().isoformat(),
-        "version": "1.1.0",
-        "services": {
-            "applications": "healthy" if applications_healthy else "unhealthy",
-            "matching": "healthy" if matching_healthy else "unhealthy",
-            "auth": "healthy" if auth_healthy else "unhealthy"
-        }
+    # Add circuit breaker status
+    from infrastructure.circuit_breaker import get_all_circuit_breaker_status
+    response_data["circuit_breakers"] = get_all_circuit_breaker_status()
+    
+    # Add service registry status
+    response_data["service_registry"] = service_registry.get_service_status()
+    
+    # Add legacy adapter checks for backward compatibility
+    response_data["legacy_checks"] = {
+        "applications": "healthy" if applications_healthy else "unhealthy",
+        "matching": "healthy" if matching_healthy else "unhealthy",
+        "auth": "healthy" if auth_healthy else "unhealthy"
     }
     
     return response_data
+
+
+@app.get("/api/health/transactions")
+async def transaction_health_check():
+    """Transaction manager health and statistics"""
+    from infrastructure.transaction_manager import transaction_manager
+    
+    stats = transaction_manager.get_transaction_stats()
+    return {
+        "transaction_stats": stats,
+        "pending_transactions": len(transaction_manager.pending_transactions),
+        "status": "healthy" if stats.get("pending", 0) < 10 else "degraded"  # Too many pending is bad
+    }
 
 
 # Auth endpoints (proxy to auth service)
@@ -364,7 +405,7 @@ async def services_health_check():
 async def register_user(request: RegisterUserRequest, req: Request):
     """Register a new user account"""
     trace_id = get_trace_id(req)
-    start_time = datetime.utcnow()
+    start_time = datetime.now(UTC)
     
     log_structured(
         logger, "INFO", "BFF user registration request",
@@ -383,7 +424,7 @@ async def register_user(request: RegisterUserRequest, req: Request):
             request.role
         )
         
-        duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+        duration_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
         
         log_structured(
             logger, "INFO", "BFF user registration response",
@@ -415,14 +456,15 @@ async def register_user(request: RegisterUserRequest, req: Request):
             error=str(e),
             errorType=type(e).__name__
         )
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        err = StandardErrorResponse(error="internal_error", message="Internal server error", code=500, details={"reason": str(e)})
+        raise HTTPException(status_code=500, detail=err.model_dump())
 
 
 @app.post("/api/auth/login")
 async def login_user(request: LoginUserRequest, req: Request):
     """Login with email and password"""
     trace_id = get_trace_id(req)
-    start_time = datetime.utcnow()
+    start_time = datetime.now(UTC)
     
     log_structured(
         logger, "INFO", "BFF user login request",
@@ -435,7 +477,7 @@ async def login_user(request: LoginUserRequest, req: Request):
     try:
         response = await auth_adapter.login_user(request.email, request.password)
         
-        duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+        duration_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
         
         log_structured(
             logger, "INFO", "BFF user login response",
@@ -466,14 +508,44 @@ async def login_user(request: LoginUserRequest, req: Request):
             error=str(e),
             errorType=type(e).__name__
         )
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        err = StandardErrorResponse(error="internal_error", message="Internal server error", code=500, details={"reason": str(e)})
+        raise HTTPException(status_code=500, detail=err.model_dump())
+
+
+@app.post("/api/auth/reset-password")
+async def reset_password(request: ResetPasswordRequest, req: Request):
+    """Temporary insecure reset: set new password by email and approve immediately.
+    TODO(security): Replace with secure token-based reset and email verification.
+    """
+    trace_id = get_trace_id(req)
+    try:
+        response = await auth_adapter.reset_password(request.email, request.newPassword)
+        log_structured(
+            logger, "INFO", "BFF password reset (temporary flow)",
+            trace_id=trace_id,
+            operation="reset_password",
+            email=request.email
+        )
+        return response
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_structured(
+            logger, "ERROR", "BFF password reset failed - unexpected error",
+            trace_id=trace_id,
+            operation="reset_password",
+            error=str(e),
+            errorType=type(e).__name__
+        )
+        err = StandardErrorResponse(error="internal_error", message="Internal server error", code=500, details={"reason": str(e)})
+        raise HTTPException(status_code=500, detail=err.model_dump())
 
 
 @app.post("/api/auth/refresh")
 async def refresh_tokens(request: RefreshTokenRequest, req: Request):
     """Refresh access token"""
     trace_id = get_trace_id(req)
-    start_time = datetime.utcnow()
+    start_time = datetime.now(UTC)
     
     log_structured(
         logger, "INFO", "BFF token refresh request",
@@ -485,7 +557,7 @@ async def refresh_tokens(request: RefreshTokenRequest, req: Request):
     try:
         response = await auth_adapter.refresh_tokens(request.refreshToken)
         
-        duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+        duration_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
         
         log_structured(
             logger, "INFO", "BFF token refresh response",
@@ -507,19 +579,21 @@ async def refresh_tokens(request: RefreshTokenRequest, req: Request):
             error=str(e),
             errorType=type(e).__name__
         )
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        err = StandardErrorResponse(error="internal_error", message="Internal server error", code=500, details={"reason": str(e)})
+        raise HTTPException(status_code=500, detail=err.model_dump())
 
 
 @app.get("/api/auth/me")
 async def get_current_user(req: Request):
     """Get current user profile"""
     trace_id = get_trace_id(req)
-    start_time = datetime.utcnow()
+    start_time = datetime.now(UTC)
     
     # Extract Bearer token from Authorization header
     auth_header = req.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
+        err = StandardErrorResponse(error="unauthorized", message="Missing or invalid authorization header", code=401)
+        raise HTTPException(status_code=401, detail=err.model_dump())
     
     access_token = auth_header.replace("Bearer ", "")
     
@@ -533,7 +607,7 @@ async def get_current_user(req: Request):
     try:
         response = await auth_adapter.get_current_user(access_token)
         
-        duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+        duration_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
         
         log_structured(
             logger, "INFO", "BFF get current user response",
@@ -556,13 +630,60 @@ async def get_current_user(req: Request):
             error=str(e),
             errorType=type(e).__name__
         )
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        err = StandardErrorResponse(error="internal_error", message="Internal server error", code=500, details={"reason": str(e)})
+        raise HTTPException(status_code=500, detail=err.model_dump())
 
 
-# Initialize service adapters
-applications_adapter = ApplicationsAdapter()
-matching_adapter = MatchingAdapter()
+# Initialize service registry and adapters
+from infrastructure.service_registry import service_registry
+from infrastructure.health_checker import create_service_health_checker, check_http_endpoint
+
+# Register default services
+service_registry.register_default_services()
+
+# Initialize service adapters with service registry
+applications_adapter = ApplicationsAdapter(service_registry)
+matching_adapter = MatchingAdapter(service_registry)
 auth_adapter = AuthAdapter()
+
+# Initialize health checker with service dependencies
+health_checker = create_service_health_checker("bff")
+
+# Add service dependencies to health checker
+health_checker.add_dependency(
+    "applications_service",
+    lambda: check_http_endpoint("http://localhost:8001/health"),
+    timeout_seconds=3.0,
+    critical=False  # Degraded but not unhealthy if down
+)
+
+health_checker.add_dependency(
+    "matching_service", 
+    lambda: check_http_endpoint("http://localhost:8003/health"),
+    timeout_seconds=3.0,
+    critical=False
+)
+
+health_checker.add_dependency(
+    "auth_service",
+    lambda: check_http_endpoint("http://localhost:8004/health"),
+    timeout_seconds=3.0,
+    critical=True  # Auth is critical for BFF functionality
+)
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize service health monitoring on startup"""
+    await service_registry.start_health_monitor()
+    logger.info("Service registry health monitoring started")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Clean up service health monitoring on shutdown"""
+    await service_registry.stop_health_monitor()
+    logger.info("Service registry health monitoring stopped")
 
 
 # Volunteer endpoints with real service calls
@@ -570,7 +691,7 @@ auth_adapter = AuthAdapter()
 async def get_quick_match(request: QuickMatchRequest, req: Request):
     """Get quick match suggestions for a volunteer"""
     trace_id = get_trace_id(req)
-    start_time = datetime.utcnow()
+    start_time = datetime.now(UTC)
     
     log_structured(
         logger, "INFO", "BFF quick match request",
@@ -591,7 +712,7 @@ async def get_quick_match(request: QuickMatchRequest, req: Request):
             for i, m in enumerate(raw_matches)
         ]
         
-        duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+        duration_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
         
         # Log successful aggregation  
         log_structured(
@@ -662,7 +783,7 @@ async def get_quick_match(request: QuickMatchRequest, req: Request):
 async def submit_application(request: SubmitApplicationRequest, req: Request):
     """Submit a volunteer application"""
     trace_id = get_trace_id(req)
-    start_time = datetime.utcnow()
+    start_time = datetime.now(UTC)
     
     log_structured(
         logger, "INFO", "BFF application submission request",
@@ -683,7 +804,7 @@ async def submit_application(request: SubmitApplicationRequest, req: Request):
             authorization=auth_header
         )
         
-        duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+        duration_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
         
         log_structured(
             logger, "INFO", "BFF application submission response",
@@ -726,14 +847,15 @@ async def submit_application(request: SubmitApplicationRequest, req: Request):
             error=str(e),
             errorType=type(e).__name__
         )
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        err = StandardErrorResponse(error="internal_error", message="Internal server error", code=500, details={"reason": str(e)})
+        raise HTTPException(status_code=500, detail=err.model_dump())
 
 
 @app.get("/api/volunteer/{volunteer_id}/dashboard")
 async def get_volunteer_dashboard(volunteer_id: str, req: Request):
     """Get volunteer dashboard data"""
     trace_id = get_trace_id(req)
-    start_time = datetime.utcnow()
+    start_time = datetime.now(UTC)
     
     log_structured(
         logger, "INFO", "BFF dashboard request",
@@ -778,7 +900,7 @@ async def get_volunteer_dashboard(volunteer_id: str, req: Request):
             "recentMatches": recent_matches
         }
         
-        duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+        duration_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
         
         log_structured(
             logger, "INFO", "BFF dashboard response",

@@ -58,12 +58,12 @@ RESET_COLOR = "\033[0m"
 def print_banner():
     """Print startup banner"""
     print(f"""
-{RESET_COLOR}╔══════════════════════════════════════════════════════════════╗
-║                     🚀 SERAAJ SERVICES 🚀                    ║
-║              Event-Sourced Volunteer Management              ║
-╠══════════════════════════════════════════════════════════════╣
-║  Phase 0-9 Complete: Auth, PostgreSQL, Redis, CI/CD, UI     ║
-╚══════════════════════════════════════════════════════════════╝
+{RESET_COLOR}================================================================
+                       SERAAJ SERVICES
+              Event-Sourced Volunteer Management
+================================================================
+  Phase 0-9 Complete: Auth, PostgreSQL, Redis, CI/CD, UI
+================================================================
 """)
 
 def start_service(service):
@@ -105,10 +105,10 @@ def main():
             time.sleep(1)  # Stagger startup
     
     if not processes:
-        print("❌ No services started successfully")
+        print("No services started successfully")
         return
     
-    print(f"\n⏳ Waiting for services to become healthy...")
+    print(f"\nWaiting for services to become healthy...")
     time.sleep(5)
     
     # Check health
@@ -116,28 +116,28 @@ def main():
     for service, process in processes:
         if check_service_health(service):
             healthy_services.append(service)
-            print(f"{service['color']}[{service['name']}]{RESET_COLOR} ✅ Healthy")
+            print(f"{service['color']}[{service['name']}]{RESET_COLOR} Healthy")
         else:
-            print(f"{service['color']}[{service['name']}]{RESET_COLOR} ⚠️  Not responding")
+            print(f"{service['color']}[{service['name']}]{RESET_COLOR} Not responding")
     
     # Print summary
     print(f"""
-╔══════════════════════════════════════════════════════════════╗
-║                    📊 SERVICE SUMMARY                        ║
-╠══════════════════════════════════════════════════════════════╣
-║  Services Started: {len(processes)}/7                                      ║
-║  Services Healthy: {len(healthy_services)}/7                                      ║ 
-╠══════════════════════════════════════════════════════════════╣
-║  🌐 BFF API:       http://localhost:8000/api/health         ║
-║  🔐 Auth:          http://localhost:8004/health             ║
-║  📝 Applications:  http://localhost:8001/health             ║
-║  🎯 Matching:      http://localhost:8003/health             ║
-║  👥 Volunteers:    http://localhost:8005/health (STUB)      ║
-║  🎪 Opportunities: http://localhost:8006/health (STUB)      ║
-║  🏢 Organizations: http://localhost:8007/health (STUB)      ║
-╠══════════════════════════════════════════════════════════════╣
-║  Press Ctrl+C to stop all services                          ║
-╚══════════════════════════════════════════════════════════════╝
+================================================================
+                      SERVICE SUMMARY                        
+================================================================
+  Services Started: {len(processes)}/7                                      
+  Services Healthy: {len(healthy_services)}/7                                       
+================================================================
+  BFF API:       http://localhost:8000/api/health         
+  Auth:          http://localhost:8004/health             
+  Applications:  http://localhost:8001/health             
+  Matching:      http://localhost:8003/health             
+  Volunteers:    http://localhost:8005/health (STUB)      
+  Opportunities: http://localhost:8006/health (STUB)      
+  Organizations: http://localhost:8007/health (STUB)      
+================================================================
+  Press Ctrl+C to stop all services                          
+================================================================
 """)
     
     # Keep running until interrupted
@@ -145,13 +145,13 @@ def main():
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print(f"\n{RESET_COLOR}🛑 Shutting down all services...")
+        print(f"\n{RESET_COLOR}Shutting down all services...")
         for service, process in processes:
             if process.poll() is None:  # Still running
                 print(f"  Stopping {service['name']}...")
                 process.terminate()
         
-        print("✅ All services stopped")
+        print("All services stopped")
 
 if __name__ == "__main__":
     main()

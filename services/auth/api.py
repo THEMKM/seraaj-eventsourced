@@ -1,7 +1,7 @@
 """
 FastAPI application for Auth service matching OpenAPI v1.1.0 specification
 """
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Optional
 
 import uvicorn
@@ -18,6 +18,8 @@ from services.shared.auth_models import (
     User,
     UserRole
 )
+from pydantic import BaseModel, Field
+from services.shared.models import StandardErrorResponse
 from services.shared.logging_config import (
     StructuredLoggingMiddleware, 
     setup_json_logging, 
@@ -28,6 +30,12 @@ from services.shared.logging_config import (
     log_performance_metric
 )
 from .service import AuthService
+
+# Temporary reset password request without verification (MVP only)
+# TODO(security): Replace with token-based reset flow with email verification.
+class ResetPasswordRequest(BaseModel):
+    email: str = Field(..., description="User's email address")
+    newPassword: str = Field(..., min_length=8, max_length=128, description="New password (minimum 8 characters)")
 
 app = FastAPI(
     title="Seraaj Authentication API",
@@ -62,7 +70,7 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "auth",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "version": "1.1.0"
     }
 
@@ -72,7 +80,7 @@ async def liveness_check():
     """Kubernetes liveness probe - is the service running?"""
     return {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "service": "auth",
         "version": "1.1.0"
     }
@@ -102,9 +110,47 @@ async def readiness_check():
     
     return {
         "status": "healthy" if overall_healthy else "unhealthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "checks": checks
     }
+
+@app.post("/auth/reset-password")
+async def reset_password(request: ResetPasswordRequest, req: Request, service: AuthService = Depends(get_auth_service)):
+    """Temporary insecure reset: set new password by email and approve immediately.
+    TODO(security): Replace with secure token-based reset and email verification.
+    """
+    trace_id = get_trace_id(req)
+    try:
+        result = await service.reset_password(request.email, request.newPassword)
+        log_structured(
+            logger, "INFO", "Password reset (temporary flow)",
+            trace_id=trace_id,
+            operation="reset_password",
+            email=request.email,
+            userId=result.get("userId")
+        )
+        return {"status": "ok"}
+    except ValueError as e:
+        log_structured(
+            logger, "WARN", "Password reset failed",
+            trace_id=trace_id,
+            operation="reset_password",
+            email=request.email,
+            error=str(e)
+        )
+        err = StandardErrorResponse(error="INVALID_REQUEST", message=str(e), code=status.HTTP_400_BAD_REQUEST)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=err.model_dump())
+    except Exception as e:
+        log_structured(
+            logger, "ERROR", "Password reset unexpected error",
+            trace_id=trace_id,
+            operation="reset_password",
+            email=request.email,
+            error=str(e),
+            errorType=type(e).__name__
+        )
+        err = StandardErrorResponse(error="INTERNAL_ERROR", message="Internal server error", code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=err.model_dump())
 
 @app.post("/auth/register", 
          status_code=status.HTTP_201_CREATED,
@@ -116,7 +162,7 @@ async def readiness_check():
 async def register_user(request: RegisterUserRequest, req: Request, service: AuthService = Depends(get_auth_service)):
     """Register a new user account"""
     trace_id = get_trace_id(req)
-    start_time = datetime.utcnow()
+    start_time = datetime.now(UTC)
     
     log_structured(
         logger, "INFO", "User registration requested",
@@ -134,14 +180,14 @@ async def register_user(request: RegisterUserRequest, req: Request, service: Aut
             role=request.role.value
         )
         
-        duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+        duration_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
         
         log_structured(
             logger, "INFO", "User registered successfully",
             trace_id=trace_id,
             operation="register_user",
             email=request.email,
-            userId=result['user'].id,
+            userId=str(result['user'].id),
             role=request.role.value,
             durationMs=duration_ms
         )
@@ -169,10 +215,8 @@ async def register_user(request: RegisterUserRequest, req: Request, service: Aut
                 email=request.email,
                 error=error_msg
             )
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={"error": "EMAIL_EXISTS", "message": error_msg}
-            )
+            err = StandardErrorResponse(error="EMAIL_EXISTS", message=error_msg, code=status.HTTP_409_CONFLICT)
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=err.model_dump())
         else:
             log_structured(
                 logger, "WARN", "Registration failed - invalid request",
@@ -181,10 +225,8 @@ async def register_user(request: RegisterUserRequest, req: Request, service: Aut
                 email=request.email,
                 error=error_msg
             )
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"error": "INVALID_REQUEST", "message": error_msg}
-            )
+            err = StandardErrorResponse(error="INVALID_REQUEST", message=error_msg, code=status.HTTP_400_BAD_REQUEST)
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=err.model_dump())
     except Exception as e:
         log_structured(
             logger, "ERROR", "Unexpected error during user registration",
@@ -194,10 +236,8 @@ async def register_user(request: RegisterUserRequest, req: Request, service: Aut
             error=str(e),
             errorType=type(e).__name__
         )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": "INTERNAL_ERROR", "message": "Internal server error"}
-        )
+        err = StandardErrorResponse(error="INTERNAL_ERROR", message="Internal server error", code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=err.model_dump())
 
 @app.post("/auth/login",
          response_model=AuthResponse,
@@ -208,7 +248,7 @@ async def register_user(request: RegisterUserRequest, req: Request, service: Aut
 async def login_user(request: LoginUserRequest, req: Request, service: AuthService = Depends(get_auth_service)):
     """Login with email and password"""
     trace_id = get_trace_id(req)
-    start_time = datetime.utcnow()
+    start_time = datetime.now(UTC)
     
     log_structured(
         logger, "INFO", "User login requested",
@@ -223,14 +263,14 @@ async def login_user(request: LoginUserRequest, req: Request, service: AuthServi
             password=request.password
         )
         
-        duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+        duration_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
         
         log_structured(
             logger, "INFO", "User logged in successfully",
             trace_id=trace_id,
             operation="login_user",
             email=request.email,
-            userId=result['user'].id,
+            userId=str(result['user'].id),
             role=result['user'].role,
             durationMs=duration_ms
         )
@@ -258,10 +298,8 @@ async def login_user(request: LoginUserRequest, req: Request, service: AuthServi
                 email=request.email,
                 error=error_msg
             )
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail={"error": "ACCOUNT_SUSPENDED", "message": error_msg}
-            )
+            err = StandardErrorResponse(error="ACCOUNT_SUSPENDED", message=error_msg, code=status.HTTP_403_FORBIDDEN)
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=err.model_dump())
         else:
             log_structured(
                 logger, "WARN", "Login failed - invalid credentials",
@@ -270,10 +308,8 @@ async def login_user(request: LoginUserRequest, req: Request, service: AuthServi
                 email=request.email,
                 error=error_msg
             )
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail={"error": "INVALID_CREDENTIALS", "message": error_msg}
-            )
+        err = StandardErrorResponse(error="INVALID_CREDENTIALS", message=error_msg, code=status.HTTP_401_UNAUTHORIZED)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=err.model_dump())
     except Exception as e:
         log_structured(
             logger, "ERROR", "Unexpected error during user login",
@@ -283,10 +319,8 @@ async def login_user(request: LoginUserRequest, req: Request, service: AuthServi
             error=str(e),
             errorType=type(e).__name__
         )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": "INTERNAL_ERROR", "message": "Internal server error"}
-        )
+        err = StandardErrorResponse(error="INTERNAL_ERROR", message="Internal server error", code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=err.model_dump())
 
 @app.post("/auth/refresh",
          response_model=AuthTokens,
@@ -327,10 +361,8 @@ async def refresh_tokens(request: RefreshTokenRequest, req: Request, service: Au
             operation="refresh_tokens",
             error=str(e)
         )
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={"error": "INVALID_TOKEN", "message": str(e)}
-        )
+        err = StandardErrorResponse(error="INVALID_TOKEN", message=str(e), code=status.HTTP_401_UNAUTHORIZED)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=err.model_dump())
     except Exception as e:
         log_structured(
             logger, "ERROR", "Unexpected error during token refresh",
@@ -339,10 +371,8 @@ async def refresh_tokens(request: RefreshTokenRequest, req: Request, service: Au
             error=str(e),
             errorType=type(e).__name__
         )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": "INTERNAL_ERROR", "message": "Internal server error"}
-        )
+        err = StandardErrorResponse(error="INTERNAL_ERROR", message="Internal server error", code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=err.model_dump())
 
 @app.get("/auth/me",
         response_model=User,
@@ -369,10 +399,8 @@ async def get_current_user(
             trace_id=trace_id,
             operation="get_current_user"
         )
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={"error": "MISSING_TOKEN", "message": "Authorization header required"}
-        )
+        err = StandardErrorResponse(error="MISSING_TOKEN", message="Authorization header required", code=status.HTTP_401_UNAUTHORIZED)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=err.model_dump())
     
     if not authorization.startswith("Bearer "):
         log_structured(
@@ -380,10 +408,8 @@ async def get_current_user(
             trace_id=trace_id,
             operation="get_current_user"
         )
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={"error": "INVALID_TOKEN", "message": "Invalid authorization header format"}
-        )
+        err = StandardErrorResponse(error="INVALID_TOKEN", message="Invalid authorization header format", code=status.HTTP_401_UNAUTHORIZED)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=err.model_dump())
     
     access_token = authorization[7:]  # Remove "Bearer " prefix
     
@@ -394,7 +420,7 @@ async def get_current_user(
             logger, "INFO", "Current user profile retrieved successfully",
             trace_id=trace_id,
             operation="get_current_user",
-            userId=user.id,
+            userId=str(user.id),
             email=user.email,
             role=user.role
         )
@@ -408,10 +434,8 @@ async def get_current_user(
             operation="get_current_user",
             error=str(e)
         )
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={"error": "INVALID_TOKEN", "message": str(e)}
-        )
+        err = StandardErrorResponse(error="INVALID_TOKEN", message=str(e), code=status.HTTP_401_UNAUTHORIZED)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=err.model_dump())
     except Exception as e:
         log_structured(
             logger, "ERROR", "Unexpected error during profile retrieval",
@@ -420,10 +444,12 @@ async def get_current_user(
             error=str(e),
             errorType=type(e).__name__
         )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": "INTERNAL_ERROR", "message": "Internal server error"}
-        )
+        err = StandardErrorResponse(error="INTERNAL_ERROR", message="Internal server error", code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=err.model_dump())
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8004)
+    from services.shared.port_config import get_service_startup_config
+    
+    host, port = get_service_startup_config("auth")
+    print(f"Starting Auth service on {host}:{port}")
+    uvicorn.run(app, host=host, port=port)

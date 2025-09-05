@@ -75,6 +75,12 @@ def migrate_file_line_events(path: Path):
             except json.JSONDecodeError:
                 continue
             migrated = migrate_line_event(obj)
+            # Normalize nested datetime fields if present
+            data = migrated.get('data')
+            if isinstance(data, dict):
+                for key in ('generatedAt', 'expiresAt'):
+                    if isinstance(data.get(key), str) and ' ' in data[key]:
+                        data[key] = data[key].replace(' ', 'T')
             dst.write(json.dumps(migrated, ensure_ascii=False) + "\n")
     tmp.replace(path)
 
@@ -100,6 +106,12 @@ def migrate_match_history(path: Path):
                 dst.write(json.dumps(migrated, ensure_ascii=False) + "\n")
                 continue
             # Convert snapshot into event
+            # Normalize inner snapshot datetime fields
+            if isinstance(item.get('generatedAt'), str) and ' ' in item['generatedAt']:
+                item['generatedAt'] = item['generatedAt'].replace(' ', 'T')
+            if isinstance(item.get('expiresAt'), str) and ' ' in item['expiresAt']:
+                item['expiresAt'] = item['expiresAt'].replace(' ', 'T')
+
             event = {
                 'eventId': str(uuid4()),
                 'eventType': 'match.suggestion_generated',
@@ -112,14 +124,36 @@ def migrate_match_history(path: Path):
     tmp.replace(path)
 
 
+def fix_space_separated_datetimes_in_match_suggestions(path: Path):
+    """Ensure generatedAt/expiresAt use ISO 8601 with 'T' separator"""
+    if not path.exists():
+        return
+    backup = path.with_suffix(path.suffix + ".backup")
+    shutil.copy(path, backup)
+    try:
+        data = json.loads(path.read_text(encoding='utf-8'))
+    except Exception:
+        return
+    changed = False
+    for item in data:
+        for key in ("generatedAt", "expiresAt"):
+            if isinstance(item.get(key), str) and ' ' in item[key]:
+                item[key] = item[key].replace(' ', 'T')
+                changed = True
+    if changed:
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding='utf-8')
+
+
 def main():
     migrate_file_line_events(DATA_DIR / 'auth_events.jsonl')
     migrate_file_line_events(DATA_DIR / 'auth_domain_events.jsonl')
     migrate_file_line_events(DATA_DIR / 'application_events.jsonl')
     migrate_match_history(DATA_DIR / 'match_history.jsonl')
+    # In case match_history already contains events, normalize nested datetimes
+    migrate_file_line_events(DATA_DIR / 'match_history.jsonl')
+    fix_space_separated_datetimes_in_match_suggestions(DATA_DIR / 'match_suggestions.json')
     print("Migration complete.")
 
 
 if __name__ == '__main__':
     main()
-

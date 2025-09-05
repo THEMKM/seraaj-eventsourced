@@ -1,7 +1,7 @@
 """
 FastAPI application for Organizations service - STUB
 """
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import List, Optional
 
 import uvicorn
@@ -54,7 +54,7 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "organizations-stub",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "version": "0.1.0-stub"
     }
 
@@ -127,4 +127,8 @@ async def verify_organization(organization_id: str):
 
 # Main entry point
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8007)
+    from services.shared.port_config import get_service_startup_config
+    
+    host, port = get_service_startup_config("organizations")
+    print(f"Starting Organizations service on {host}:{port}")
+    uvicorn.run(app, host=host, port=port)

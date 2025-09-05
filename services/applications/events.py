@@ -3,11 +3,13 @@ Event publishing and event store for Applications service
 """
 import os
 import json
+import gzip
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any
 from uuid import uuid4
 import logging
+from infrastructure.sequence import SequenceStore
 
 try:
     from infrastructure.event_bus import RedisEventBus
@@ -17,6 +19,7 @@ except ImportError:
     REDIS_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
+from infrastructure.event_types import EventSchemas
 
 
 class EventPublisher:
@@ -27,6 +30,7 @@ class EventPublisher:
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(exist_ok=True)
         self.event_log = self.data_dir / "application_events.jsonl"
+        self._seq = SequenceStore(data_dir)
         
         # Redis event bus (for cross-service communication)
         self.use_redis = use_redis if use_redis is not None else os.getenv("USE_REDIS_EVENTS", "true").lower() == "true"
@@ -40,34 +44,49 @@ class EventPublisher:
                 self.redis_bus = None
     
     async def publish(self, event_type: str, data: Dict[str, Any]):
-        """Publish an event to both file store and Redis (dual publishing)"""
+        """Publish an event to both file store and Redis with transaction consistency"""
+        from infrastructure.transaction_manager import transaction_manager
+        
         event = {
             "eventId": str(uuid4()),
             "eventType": event_type,
             "timestamp": datetime.utcnow().isoformat(),
             "organizationId": data.get("organizationId"),
+            "sequence": self._seq.next("applications"),
             "data": data
         }
         
-        # 1. File-based publishing (existing functionality)
-        with open(self.event_log, "a", encoding="utf-8") as f:
-            f.write(json.dumps(event, default=str) + "\n")
+        # Validate payload against schema if defined
+        EventSchemas.validate_payload(event_type, data)
+
+        # Use transaction manager for atomic dual publishing
+        success = await transaction_manager.publish_dual_atomic(
+            event_data=event,
+            file_path=self.event_log,
+            redis_client=self.redis_bus,
+            redis_stream="seraaj:events:applications"
+        )
         
-        # 2. Redis publishing (new functionality)
-        redis_published = False
-        if self.redis_bus:
+        if success:
+            logger.info(f"[EVENT-ATOMIC] Successfully published event: {event_type}")
+        else:
+            logger.warning(f"[EVENT-FAILED] Failed to publish event atomically: {event_type}")
+            
+            # Fallback to file-only mode
             try:
-                stream_id = await self.redis_bus.publish(
-                    event_type,
-                    data,
-                    source_service="applications"
-                )
-                redis_published = stream_id is not None
+                line = json.dumps(event, default=str) + "\n"
+                with open(self.event_log, "a", encoding="utf-8") as f:
+                    f.write(line)
+                # Optional gzip mirror for archival/compression
+                if os.getenv("EVENT_MIRROR_GZ", "false").lower() == "true":
+                    gz_path = str(self.event_log) + ".gz"
+                    with gzip.open(gz_path, "ab") as gf:
+                        gf.write(line.encode("utf-8"))
+                logger.info(f"[EVENT-FALLBACK] Published to file only: {event_type}")
             except Exception as e:
-                logger.warning(f"Redis event publishing failed: {e}")
+                logger.error(f"[EVENT-ERROR] Complete publishing failure: {e}")
+                raise
         
-        status = "DUAL" if redis_published else "FILE"
-        print(f"[EVENT-{status}] Published event: {event_type}")
         return event
     
     # Convenience methods using standard event types

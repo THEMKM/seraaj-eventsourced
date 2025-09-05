@@ -1,7 +1,7 @@
 """
 FastAPI application for Volunteers service - STUB
 """
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import List, Optional
 
 import uvicorn
@@ -51,7 +51,7 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "volunteers-stub",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "version": "0.1.0-stub"
     }
 
@@ -108,4 +108,8 @@ async def list_volunteers(limit: int = 10, offset: int = 0):
 
 # Main entry point
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8005)
+    from services.shared.port_config import get_service_startup_config
+    
+    host, port = get_service_startup_config("volunteers")
+    print(f"Starting Volunteers service on {host}:{port}")
+    uvicorn.run(app, host=host, port=port)

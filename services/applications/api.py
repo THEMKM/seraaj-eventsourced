@@ -1,7 +1,7 @@
 """
 FastAPI application for Applications service
 """
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import List, Optional
 from uuid import UUID
 
@@ -12,7 +12,7 @@ import jwt
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from services.shared.models import Application, ExternalApplication
+from services.shared.models import Application, ExternalApplication, StandardErrorResponse
 from services.shared.logging_config import (
     StructuredLoggingMiddleware, 
     setup_json_logging, 
@@ -50,6 +50,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Lightweight JWT verification (optional enforcement via REQUIRE_SERVICE_AUTH)
+def verify_service_token(authorization: str | None = Header(default=None)) -> dict | None:
+    require = os.getenv('REQUIRE_SERVICE_AUTH', 'false').lower() == 'true'
+    if not authorization or not authorization.startswith('Bearer '):
+        if require:
+            err = StandardErrorResponse(error='unauthorized', message='Missing or invalid token', code=401)
+            raise HTTPException(status_code=401, detail=err.model_dump())
+        return None
+    token = authorization.split(' ', 1)[1]
+    secret = os.getenv('JWT_SECRET', 'dev-secret-change-in-production')
+    try:
+        payload = jwt.decode(token, secret, algorithms=['HS256'])
+        return payload
+    except Exception:
+        if require:
+            err = StandardErrorResponse(error='unauthorized', message='Invalid token', code=401)
+            raise HTTPException(status_code=401, detail=err.model_dump())
+        return None
+
 # Service dependency
 def get_application_service() -> ApplicationService:
     return ApplicationService()
@@ -68,15 +87,24 @@ class UpdateStateRequest(BaseModel):
 
 
 # Health check endpoints
+from infrastructure.health_checker import create_service_health_checker, check_file_exists
+
+# Initialize health checker for applications service
+app_health_checker = create_service_health_checker("applications")
+
+# Add service-specific dependencies
+app_health_checker.add_dependency(
+    "application_data_file",
+    lambda: check_file_exists("data/applications.json"),
+    timeout_seconds=1.0,
+    critical=False
+)
+
 @app.get("/health")
 async def health_check():
-    """Basic health check endpoint"""
-    return {
-        "status": "healthy",
-        "service": "applications",
-        "timestamp": datetime.utcnow().isoformat(),
-        "version": "1.0.0"
-    }
+    """Dependency-aware health check endpoint"""
+    health_result = await app_health_checker.check_health()
+    return health_result.to_dict()
 
 
 @app.get("/health/live")
@@ -84,7 +112,7 @@ async def liveness_check():
     """Kubernetes liveness probe - is the service running?"""
     return {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "service": "applications",
         "version": "1.0.0"
     }
@@ -106,7 +134,7 @@ async def readiness_check():
     
     return {
         "status": "healthy" if overall_healthy else "unhealthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "checks": checks
     }
 
@@ -121,7 +149,7 @@ async def submit_application(
 ):
     """Submit a new application"""
     trace_id = get_trace_id(req)
-    start_time = datetime.utcnow()
+    start_time = datetime.now(UTC)
     
     log_structured(
         logger, "INFO", "Application submission started",
@@ -140,7 +168,7 @@ async def submit_application(
         application = await service.submit_application(command)
         
         # Log successful creation
-        duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+        duration_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
         log_structured(
             logger, "INFO", "Application created successfully",
             trace_id=trace_id,
@@ -149,6 +177,17 @@ async def submit_application(
             volunteerId=request.volunteerId,
             opportunityId=request.opportunityId,
             durationMs=duration_ms
+        )
+
+        # Performance metric
+        log_performance_metric(
+            logger,
+            "applications_submit",
+            duration_ms,
+            trace_id=trace_id,
+            applicationId=application.id,
+            volunteerId=request.volunteerId,
+            opportunityId=request.opportunityId
         )
         
         # Log business metric
@@ -174,7 +213,8 @@ async def submit_application(
             volunteerId=request.volunteerId,
             opportunityId=request.opportunityId
         )
-        raise HTTPException(status_code=400, detail=str(e))
+        err = StandardErrorResponse(error="validation_error", message=str(e), code=400)
+        raise HTTPException(status_code=400, detail=err.model_dump())
         
     except Exception as e:
         # Log system errors
@@ -186,7 +226,8 @@ async def submit_application(
             errorType=type(e).__name__,
             volunteerId=request.volunteerId
         )
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        err = StandardErrorResponse(error="internal_error", message="Internal server error", code=500, details={"reason": str(e)})
+        raise HTTPException(status_code=500, detail=err.model_dump())
 
 
 @app.get("/api/applications/{application_id}", response_model=ExternalApplication)
@@ -215,7 +256,8 @@ async def get_application(
                 operation="get_application",
                 applicationId=application_id
             )
-            raise HTTPException(status_code=404, detail="Application not found")
+            err = StandardErrorResponse(error="not_found", message="Application not found", code=404)
+            raise HTTPException(status_code=404, detail=err.model_dump())
         
         log_structured(
             logger, "INFO", "Application retrieved successfully",
@@ -238,7 +280,8 @@ async def get_application(
             error=str(e),
             applicationId=application_id
         )
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        err = StandardErrorResponse(error="internal_error", message="Internal server error", code=500, details={"reason": str(e)})
+        raise HTTPException(status_code=500, detail=err.model_dump())
 
 
 @app.patch("/api/applications/{application_id}/state", response_model=ExternalApplication)
@@ -298,7 +341,8 @@ async def update_application_state(
             applicationId=application_id,
             action=request.action
         )
-        raise HTTPException(status_code=400, detail=str(e))
+        err = StandardErrorResponse(error="validation_error", message=str(e), code=400)
+        raise HTTPException(status_code=400, detail=err.model_dump())
     except Exception as e:
         log_structured(
             logger, "ERROR", "Unexpected error in application state update",
@@ -307,7 +351,8 @@ async def update_application_state(
             error=str(e),
             applicationId=application_id
         )
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        err = StandardErrorResponse(error="internal_error", message="Internal server error", code=500, details={"reason": str(e)})
+        raise HTTPException(status_code=500, detail=err.model_dump())
 
 
 @app.get("/api/applications/volunteer/{volunteer_id}", response_model=List[ExternalApplication])
@@ -352,7 +397,8 @@ async def get_volunteer_applications(
             error=str(e),
             volunteerId=volunteer_id
         )
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+        err = StandardErrorResponse(error="internal_error", message="Internal server error", code=500, details={"reason": str(e)})
+        raise HTTPException(status_code=500, detail=err.model_dump())
 
 
 @app.get("/api/applications/opportunity/{opportunity_id}", response_model=List[ExternalApplication])
@@ -397,25 +443,13 @@ async def get_opportunity_applications(
             error=str(e),
             opportunityId=opportunity_id
         )
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
-# Lightweight JWT verification (optional enforcement via REQUIRE_SERVICE_AUTH)
-def verify_service_token(authorization: str | None = Header(default=None)) -> dict | None:
-    require = os.getenv('REQUIRE_SERVICE_AUTH', 'false').lower() == 'true'
-    if not authorization or not authorization.startswith('Bearer '):
-        if require:
-            raise HTTPException(status_code=401, detail='Missing or invalid token')
-        return None
-    token = authorization.split(' ', 1)[1]
-    secret = os.getenv('JWT_SECRET', 'dev-secret-change-in-production')
-    try:
-        payload = jwt.decode(token, secret, algorithms=['HS256'])
-        return payload
-    except Exception:
-        if require:
-            raise HTTPException(status_code=401, detail='Invalid token')
-        return None
-
+        err = StandardErrorResponse(error="internal_error", message="Internal server error", code=500, details={"reason": str(e)})
+        raise HTTPException(status_code=500, detail=err.model_dump())
 
 # Main entry point
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8001)
+    from services.shared.port_config import get_service_startup_config
+    
+    host, port = get_service_startup_config("applications")
+    print(f"Starting Applications service on {host}:{port}")
+    uvicorn.run(app, host=host, port=port)

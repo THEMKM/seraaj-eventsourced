@@ -100,7 +100,6 @@ class ExternalApplication(BaseModel):
 
 
 #   filename:  match-suggestion.schema.json
-from uuid import UUID
 class MatchSuggestionStatus(Enum):
     """
     Current status of the match suggestion
@@ -161,7 +160,6 @@ class MatchSuggestion(BaseModel):
 
 
 #   filename:  volunteer-profile-view.schema.json
-from uuid import UUID
 class VolunteerStatus(Enum):
     """
     Account status
@@ -239,3 +237,12 @@ class VolunteerProfileView(BaseModel):
     Last activity timestamp
     """
 
+
+class StandardErrorResponse(BaseModel):
+    """
+    Unified error response schema used across services and BFF
+    """
+    error: str
+    message: str
+    code: int
+    details: Optional[Dict[str, Any]] = None

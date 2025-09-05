@@ -12,6 +12,7 @@ import logging
 
 import redis.asyncio as redis
 from redis.exceptions import ConnectionError, ResponseError
+from infrastructure.event_types import EventSchemas
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +112,13 @@ class RedisEventBus:
         Returns:
             Stream ID if successful, None if Redis unavailable
         """
+        # Validate payload before publishing
+        try:
+            EventSchemas.validate_payload(event_type, payload)
+        except Exception as e:
+            logger.error(f"Event validation failed for {event_type}: {e}")
+            raise
+
         event = StreamEvent(
             id=str(uuid4()),
             type=event_type,

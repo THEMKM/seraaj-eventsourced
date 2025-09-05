@@ -26,7 +26,7 @@ async def test_redis_fallback():
     # This should fail gracefully
     stream_id = await event_bus.publish(
         EventTypes.APPLICATION_SUBMITTED,
-        {"applicationId": "test-app", "volunteerId": "test-vol"},
+        {"applicationId": "test-app", "volunteerId": "test-vol", "organizationId": "org-test"},
         source_service="test"
     )
     

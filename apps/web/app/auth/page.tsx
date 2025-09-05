@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoginForm } from '@/components/auth/LoginForm';
 import { RegisterForm } from '@/components/auth/RegisterForm';
+import { ForgotPasswordForm } from '@/components/auth/ForgotPasswordForm';
 
 function AuthPageContent() {
   const router = useRouter();
@@ -13,8 +14,9 @@ function AuthPageContent() {
   
   // Get initial mode from URL params or default to login
   const initialMode = searchParams?.get('mode') || 'login';
-  const [mode, setMode] = useState<'login' | 'register'>(
-    initialMode === 'register' ? 'register' : 'login'
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot-password'>(
+    initialMode === 'register' ? 'register' : 
+    initialMode === 'forgot-password' ? 'forgot-password' : 'login'
   );
 
   // Redirect if already authenticated
@@ -66,11 +68,16 @@ function AuthPageContent() {
           <LoginForm
             onSuccess={handleAuthSuccess}
             onSwitchToRegister={() => setMode('register')}
+            onForgotPassword={() => setMode('forgot-password')}
           />
-        ) : (
+        ) : mode === 'register' ? (
           <RegisterForm
             onSuccess={handleAuthSuccess}
             onSwitchToLogin={() => setMode('login')}
+          />
+        ) : (
+          <ForgotPasswordForm
+            onBackToLogin={() => setMode('login')}
           />
         )}
       </div>

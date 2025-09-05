@@ -9,6 +9,7 @@ from enum import Enum
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, AnyUrl
+from uuid import UUID
 
 
 class UserRole(Enum):
@@ -26,10 +27,9 @@ class User(BaseModel):
         use_enum_values=True,
     )
     
-    id: str = Field(
+    id: UUID = Field(
         ..., 
-        description='Unique user identifier (UUID format)',
-        pattern=r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        description='Unique user identifier (UUID format)'
     )
     email: str = Field(..., description="User's email address (used for authentication)")
     name: str = Field(

@@ -39,7 +39,7 @@ class AuthService:
         
         # Access token payload
         access_payload = {
-            'user_id': user.id,
+            'user_id': str(user.id),
             'email': user.email,
             'role': user.role.value if hasattr(user.role, 'value') else user.role,
             'exp': now + self.access_token_expire,
@@ -50,7 +50,7 @@ class AuthService:
         
         # Refresh token payload
         refresh_payload = {
-            'user_id': user.id,
+            'user_id': str(user.id),
             'exp': now + self.refresh_token_expire,
             'iat': now,
             'type': 'refresh',
@@ -124,7 +124,7 @@ class AuthService:
             raise ValueError("Invalid email or password")
         
         # Get internal user data for password verification
-        user_data = self.repository.get_internal_data(user.id)
+        user_data = self.repository.get_internal_data(str(user.id))
         if not user_data:
             raise ValueError("Invalid email or password")
         
@@ -141,10 +141,10 @@ class AuthService:
             raise ValueError("Account not verified")
         
         # Record login
-        await self.repository.record_login(user.id)
+        await self.repository.record_login(str(user.id))
         
         # Get updated user
-        user = await self.repository.get(user.id)
+        user = await self.repository.get(str(user.id))
         
         # Generate tokens
         tokens = self._generate_tokens(user)
@@ -167,13 +167,33 @@ class AuthService:
             raise ValueError("User not found")
         
         # Check if user is active
-        user_data = self.repository.get_internal_data(user.id)
+        user_data = self.repository.get_internal_data(str(user.id))
         if not user_data or not user_data.get('isActive', True):
             raise ValueError("User not found or inactive")
         
         # Generate new tokens
         return self._generate_tokens(user)
     
+    async def reset_password(self, email: str, new_password: str) -> Dict:
+        """Temporarily reset a user's password by email without verification.
+        NOTE: This is intentionally insecure and only for MVP/testing. Replace with
+        a proper token-based reset flow (email verification) later.
+        """
+        # Find user
+        user = await self.repository.find_by_email(email)
+        if not user:
+            raise ValueError("User not found")
+
+        # Hash new password
+        hashed_password = self._hash_password(new_password)
+
+        # Update repository (emits password updated event)
+        updated = await self.repository.update_password(str(user.id), hashed_password)
+        if not updated:
+            raise ValueError("Failed to update password")
+
+        return {"status": "ok", "userId": str(updated.id)}
+
     async def get_current_user(self, access_token: str) -> User:
         """Get current user from access token"""
         # Verify access token
@@ -187,7 +207,7 @@ class AuthService:
             raise ValueError("User not found")
         
         # Check if user is active
-        user_data = self.repository.get_internal_data(user.id)
+        user_data = self.repository.get_internal_data(str(user.id))
         if not user_data or not user_data.get('isActive', True):
             raise ValueError("User not found or inactive")
         

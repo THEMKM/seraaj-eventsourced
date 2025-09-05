@@ -32,7 +32,8 @@ const getAccessToken = (): string | undefined => {
 // Create configuration with dynamic token access
 const createDynamicConfig = (): Configuration => ({
   basePath: BASE_URL,
-  accessToken: getAccessToken()
+  // Provide function so each request reads latest token
+  accessToken: getAccessToken
 });
 
 // Public API clients (no auth required)
