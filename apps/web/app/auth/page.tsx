@@ -27,10 +27,7 @@ function AuthPageContent() {
     }
   }, [isAuthenticated, isLoading, router, searchParams]);
 
-  const handleAuthSuccess = () => {
-    const redirectTo = searchParams?.get('redirect') || '/dashboard';
-    router.push(redirectTo);
-  };
+  const handleLoginSuccess = () => {\n    const redirectTo = searchParams?.get('redirect') || '/dashboard';\n    router.push(redirectTo);\n  };\n\n  const handleRegisterSuccess = () => {\n    router.push('/onboarding');\n  };
 
   if (isLoading) {
     return (
@@ -66,12 +63,7 @@ function AuthPageContent() {
 
         {mode === 'login' ? (
           <LoginForm
-            onSuccess={handleAuthSuccess}
-            onSwitchToRegister={() => setMode('register')}
-            onForgotPassword={() => setMode('forgot-password')}
-          />
-        ) : mode === 'register' ? (
-          <RegisterForm
+            onSuccess={handleLoginSuccess}
             onSuccess={handleAuthSuccess}
             onSwitchToLogin={() => setMode('login')}
           />
@@ -101,3 +93,4 @@ export default function AuthPage() {
     </Suspense>
   );
 }
+
