@@ -27,16 +27,23 @@ function AuthPageContent() {
     }
   }, [isAuthenticated, isLoading, router, searchParams]);
 
-  const handleLoginSuccess = () => {\n    const redirectTo = searchParams?.get('redirect') || '/dashboard';\n    router.push(redirectTo);\n  };\n\n  const handleRegisterSuccess = () => {\n    router.push('/onboarding');\n  };
+  const handleLoginSuccess = () => {
+    const redirectTo = searchParams?.get('redirect') || '/dashboard';
+    router.push(redirectTo);
+  };
+
+  const handleRegisterSuccess = () => {
+    router.push('/onboarding');
+  };
 
   if (isLoading) {
     return (
       <main className="min-h-screen bg-gradient-to-br from-deepIndigo to-ink flex items-center justify-center p-4">
         <div className="text-center">
           <div className="text-3xl font-pixel text-primary animate-px-glow mb-2">
-            🎆 SERAAJ 🎆
+            dYZ+ SERAAJ dYZ+
           </div>
-          <div className="text-sm text-white font-pixel">⏳ LOADING QUEST...</div>
+          <div className="text-sm text-white font-pixel">??3 LOADING QUEST...</div>
         </div>
       </main>
     );
@@ -51,20 +58,25 @@ function AuthPageContent() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-pixel text-primary dark:text-neon-cyan mb-2 animate-px-glow">
-            🎆 SERAAJ 🎆
+            dYZ+ SERAAJ dYZ+
           </h1>
           <div className="text-lg font-pixel text-pixel-coral dark:text-neon-pink mb-2">
             8-BIT HERO LOGIN
           </div>
           <p className="text-sm text-white">
-            🚀 Join the quest to change the world!
+            dYs? Join the quest to change the world!
           </p>
         </div>
 
         {mode === 'login' ? (
           <LoginForm
             onSuccess={handleLoginSuccess}
-            onSuccess={handleAuthSuccess}
+            onSwitchToRegister={() => setMode('register')}
+            onForgotPassword={() => setMode('forgot-password')}
+          />
+        ) : mode === 'register' ? (
+          <RegisterForm
+            onSuccess={handleRegisterSuccess}
             onSwitchToLogin={() => setMode('login')}
           />
         ) : (
@@ -83,9 +95,9 @@ export default function AuthPage() {
       <main className="min-h-screen bg-gradient-to-br from-deepIndigo to-ink flex items-center justify-center p-4">
         <div className="text-center">
           <div className="text-3xl font-pixel text-primary animate-px-glow mb-2">
-            🎆 SERAAJ 🎆
+            dYZ+ SERAAJ dYZ+
           </div>
-          <div className="text-sm text-white font-pixel">⏳ LOADING QUEST...</div>
+          <div className="text-sm text-white font-pixel">??3 LOADING QUEST...</div>
         </div>
       </main>
     }>
@@ -93,4 +105,3 @@ export default function AuthPage() {
     </Suspense>
   );
 }
-
