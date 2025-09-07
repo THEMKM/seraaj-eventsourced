@@ -33,13 +33,14 @@ interface OnboardingFlowProps {
   onComplete: (data: OnboardingData) => Promise<void> | void;
   onSkip?: () => void;
   initialEmail?: string;
+  initialUserType?: UserType | null;
 }
 
-export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onSkip, initialEmail }) => {
+export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onSkip, initialEmail, initialUserType = null }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [data, setData] = useState<OnboardingData>({
-    userType: null,
+    userType: initialUserType,
     name: '',
     email: initialEmail || '',
     location: '',
@@ -142,4 +143,3 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onSk
     </div>
   );
 };
-
