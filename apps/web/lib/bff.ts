@@ -36,10 +36,13 @@ const createDynamicConfig = (): Configuration => ({
   accessToken: getAccessToken
 });
 
-// Public API clients (no auth required)
+// Public API clients (no auth required for login/register)
 export const authApi = createAuthApi({
   basePath: BASE_URL
 });
+
+// Authenticated auth API client (for getCurrentUser)
+export const authenticatedAuthApi = createAuthApi(createDynamicConfig());
 
 export const systemApi = createSystemApi({
   basePath: BASE_URL

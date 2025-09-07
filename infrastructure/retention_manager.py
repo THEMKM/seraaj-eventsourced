@@ -9,7 +9,7 @@ import gzip
 import shutil
 import logging
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
 from enum import Enum
@@ -157,7 +157,7 @@ class EventRetentionManager:
     
     async def _process_event_file(self, file_path: Path, config: RetentionConfig) -> Dict[str, Any]:
         """Process a single event file according to its retention policy"""
-        cutoff_date = datetime.utcnow() - timedelta(days=config.retention_days)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=config.retention_days)
         
         events_to_keep = []
         events_to_archive = []
@@ -246,7 +246,7 @@ class EventRetentionManager:
             if not archive_dir.exists():
                 continue
             
-            cutoff_date = datetime.utcnow() - timedelta(days=config.archive_retention_days)
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=config.archive_retention_days)
             deleted_count = 0
             
             for archive_file in archive_dir.glob("*_archive_*.jsonl*"):
@@ -295,7 +295,7 @@ class EventRetentionManager:
                 }
                 
                 # Calculate estimated old events
-                cutoff_date = datetime.utcnow() - timedelta(days=config.retention_days)
+                cutoff_date = datetime.now(timezone.utc) - timedelta(days=config.retention_days)
                 old_events = await self._count_old_events(file_path, cutoff_date)
                 file_info["old_events_estimate"] = old_events
                 
@@ -343,7 +343,16 @@ class EventRetentionManager:
                         continue
                     try:
                         event = json.loads(line.strip())
-                        event_time = datetime.fromisoformat(event.get('timestamp', ''))
+                        timestamp_str = event.get('timestamp', '')
+                        if not timestamp_str:
+                            continue
+                        
+                        # Parse timestamp and ensure it's timezone-aware
+                        event_time = datetime.fromisoformat(timestamp_str)
+                        if event_time.tzinfo is None:
+                            # Assume UTC if no timezone info
+                            event_time = event_time.replace(tzinfo=timezone.utc)
+                        
                         if event_time < cutoff_date:
                             count += 1
                     except (json.JSONDecodeError, ValueError):

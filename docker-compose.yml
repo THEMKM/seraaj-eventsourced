@@ -11,14 +11,171 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U seraaj"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
-    
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+  
+  # Microservices
+  auth-service:
+    build: .
+    working_dir: /app
+    volumes:
+      - ./:/app
+    command: python -m services.auth.api
+    ports:
+      - "8004:8004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://seraaj:seraaj_dev@postgres/seraaj
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  applications-service:
+    build: .
+    working_dir: /app
+    volumes:
+      - ./:/app
+    command: python -m services.applications.api
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://seraaj:seraaj_dev@postgres/seraaj
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  matching-service:
+    build: .
+    working_dir: /app
+    volumes:
+      - ./:/app
+    command: python -m services.matching.api
+    ports:
+      - "8003:8003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://seraaj:seraaj_dev@postgres/seraaj
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
+      AUTH_SERVICE_URL: http://auth-service:8004
+      OPPORTUNITIES_SERVICE_URL: http://opportunities-service:8006
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  volunteers-service:
+    build: .
+    working_dir: /app
+    volumes:
+      - ./:/app
+    command: python -m services.volunteers.api
+    ports:
+      - "8005:8005"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://seraaj:seraaj_dev@postgres/seraaj
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8005/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  opportunities-service:
+    build: .
+    working_dir: /app
+    volumes:
+      - ./:/app
+    command: python -m services.opportunities.api
+    ports:
+      - "8006:8006"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://seraaj:seraaj_dev@postgres/seraaj
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8006/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  organizations-service:
+    build: .
+    working_dir: /app
+    volumes:
+      - ./:/app
+    command: python -m services.organizations.api
+    ports:
+      - "8007:8007"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://seraaj:seraaj_dev@postgres/seraaj
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8007/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   bff:
-    image: python:3.11-slim
+    build: .
     working_dir: /app
     volumes:
       - ./:/app
@@ -26,11 +183,29 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - postgres
-      - redis
+      auth-service:
+        condition: service_healthy
+      applications-service:
+        condition: service_healthy
+      matching-service:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgresql://seraaj:seraaj_dev@postgres/seraaj
       REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
+      # Service URLs for container-to-container communication
+      AUTH_SERVICE_URL: http://auth-service:8004
+      APPLICATIONS_SERVICE_URL: http://applications-service:8001
+      MATCHING_SERVICE_URL: http://matching-service:8003
+      VOLUNTEERS_SERVICE_URL: http://volunteers-service:8005
+      OPPORTUNITIES_SERVICE_URL: http://opportunities-service:8006
+      ORGANIZATIONS_SERVICE_URL: http://organizations-service:8007
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
 volumes:
   postgres_data:

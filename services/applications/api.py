@@ -86,6 +86,12 @@ class UpdateStateRequest(BaseModel):
     reason: Optional[str] = Field(None, description="Optional reason for the state change")
 
 
+class ReviewApplicationRequest(BaseModel):
+    decision: str = Field(..., description="Review decision: accept or reject")
+    reviewerNotes: Optional[str] = Field(None, max_length=2000, description="Optional reviewer notes")
+    reviewerId: Optional[str] = Field(None, description="ID of the reviewer (organization member)")
+
+
 # Health check endpoints
 from infrastructure.health_checker import create_service_health_checker, check_file_exists
 
@@ -445,6 +451,192 @@ async def get_opportunity_applications(
         )
         err = StandardErrorResponse(error="internal_error", message="Internal server error", code=500, details={"reason": str(e)})
         raise HTTPException(status_code=500, detail=err.model_dump())
+
+
+@app.post("/api/applications/{application_id}/review", response_model=ExternalApplication)
+async def review_application(
+    application_id: str,
+    request: ReviewApplicationRequest,
+    req: Request,
+    service: ApplicationService = Depends(get_application_service),
+    _token: dict | None = Depends(verify_service_token)
+):
+    """Review an application (organization endpoint)"""
+    trace_id = get_trace_id(req)
+    
+    log_structured(
+        logger, "INFO", "Application review requested",
+        trace_id=trace_id,
+        operation="review_application",
+        applicationId=application_id,
+        decision=request.decision,
+        reviewerId=request.reviewerId
+    )
+    
+    try:
+        # Validate decision
+        if request.decision not in ["accept", "reject"]:
+            err = StandardErrorResponse(
+                error="validation_error", 
+                message="Decision must be 'accept' or 'reject'", 
+                code=400
+            )
+            raise HTTPException(status_code=400, detail=err.model_dump())
+        
+        # First transition to reviewing state if not already there
+        application = await service.get_application(application_id)
+        if not application:
+            err = StandardErrorResponse(error="not_found", message="Application not found", code=404)
+            raise HTTPException(status_code=404, detail=err.model_dump())
+        
+        # Auto-transition to reviewing state if currently submitted
+        if application.status == "submitted":
+            await service.update_application_state(application_id, "review")
+        
+        # Apply the review decision
+        application = await service.update_application_state(
+            application_id=application_id,
+            action=request.decision,
+            reason=request.reviewerNotes
+        )
+        
+        # Store reviewer information if provided
+        if request.reviewerId or request.reviewerNotes:
+            # In a full implementation, this would update reviewer fields in the application
+            # For MVP, we log the review information
+            log_structured(
+                logger, "INFO", "Application review completed",
+                trace_id=trace_id,
+                operation="review_application",
+                applicationId=application_id,
+                decision=request.decision,
+                reviewerId=request.reviewerId,
+                hasNotes=bool(request.reviewerNotes)
+            )
+        
+        # Log business metric
+        log_business_metric(
+            logger, f"application_reviewed_{request.decision}", 1,
+            trace_id=trace_id,
+            applicationId=application_id,
+            reviewerId=request.reviewerId
+        )
+        
+        application_dict = application.dict()
+        application_dict['status'] = application.status.to_external_status() if hasattr(application.status, 'to_external_status') else application.status
+        return application_dict
+        
+    except ValueError as e:
+        log_structured(
+            logger, "WARN", "Application review failed - business rule violation",
+            trace_id=trace_id,
+            operation="review_application",
+            error=str(e),
+            applicationId=application_id
+        )
+        err = StandardErrorResponse(error="validation_error", message=str(e), code=400)
+        raise HTTPException(status_code=400, detail=err.model_dump())
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_structured(
+            logger, "ERROR", "Unexpected error in application review",
+            trace_id=trace_id,
+            operation="review_application",
+            error=str(e),
+            applicationId=application_id
+        )
+        err = StandardErrorResponse(error="internal_error", message="Internal server error", code=500, details={"reason": str(e)})
+        raise HTTPException(status_code=500, detail=err.model_dump())
+
+
+@app.get("/api/applications/organization/{org_id}/pending", response_model=List[ExternalApplication])
+async def get_pending_applications_for_organization(
+    org_id: str,
+    req: Request,
+    service: ApplicationService = Depends(get_application_service),
+    _token: dict | None = Depends(verify_service_token)
+):
+    """Get all pending applications for an organization's opportunities"""
+    trace_id = get_trace_id(req)
+    
+    log_structured(
+        logger, "INFO", "Organization pending applications requested",
+        trace_id=trace_id,
+        operation="get_org_pending_applications",
+        organizationId=org_id
+    )
+    
+    try:
+        # For MVP, we'll need to filter applications by checking each opportunity
+        # In production, this would be a more efficient database query
+        
+        # This is a simplified implementation - would need opportunity service integration
+        # For now, return empty list with proper logging
+        log_structured(
+            logger, "INFO", "Organization pending applications retrieved (MVP stub)",
+            trace_id=trace_id,
+            operation="get_org_pending_applications",
+            organizationId=org_id,
+            applicationCount=0
+        )
+        
+        return []
+        
+    except Exception as e:
+        log_structured(
+            logger, "ERROR", "Unexpected error in organization pending applications retrieval",
+            trace_id=trace_id,
+            operation="get_org_pending_applications",
+            error=str(e),
+            organizationId=org_id
+        )
+        err = StandardErrorResponse(error="internal_error", message="Internal server error", code=500, details={"reason": str(e)})
+        raise HTTPException(status_code=500, detail=err.model_dump())
+
+@app.get("/api/applications/stats/organization/{org_id}")
+async def get_organization_application_stats(
+    org_id: str,
+    req: Request,
+    service: ApplicationService = Depends(get_application_service),
+    _token: dict | None = Depends(verify_service_token)
+):
+    """Get application statistics for an organization"""
+    trace_id = get_trace_id(req)
+    
+    try:
+        # Get real statistics from repository
+        repo_stats = await service.get_organization_stats(org_id)
+        
+        stats = {
+            "organizationId": org_id,
+            "totalApplications": repo_stats.get("totalApplications", 0),
+            "pendingReview": repo_stats.get("pendingReview", 0),
+            "approved": repo_stats.get("approved", 0),
+            "rejected": repo_stats.get("rejected", 0),
+            "lastUpdated": datetime.now(UTC).isoformat()
+        }
+        
+        log_structured(
+            logger, "INFO", "Organization application stats retrieved",
+            trace_id=trace_id,
+            operation="get_org_application_stats",
+            organizationId=org_id
+        )
+        
+        return stats
+        
+    except Exception as e:
+        log_structured(
+            logger, "ERROR", "Unexpected error in organization stats retrieval",
+            trace_id=trace_id,
+            operation="get_org_application_stats",
+            error=str(e),
+            organizationId=org_id
+        )
+        err = StandardErrorResponse(error="internal_error", message="Internal server error", code=500, details={"reason": str(e)})
+        raise HTTPException(status_code=500, detail=err.model_dump())
+
 
 # Main entry point
 if __name__ == "__main__":

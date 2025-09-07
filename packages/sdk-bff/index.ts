@@ -198,6 +198,29 @@ export class VolunteerApi extends BaseClient {
   }): Promise<any[]> {
     return this.request<any[]>('POST', '/volunteer/quick-match', data);
   }
+
+  async getOpportunityDetails(opportunityId: string): Promise<{
+    id: string;
+    title: string;
+    description: string;
+    organization_id: string;
+    location: string;
+    is_remote: boolean;
+    skills_required: string[];
+    time_commitment: string | null;
+    start_date: string;
+    end_date: string | null;
+    max_volunteers: number;
+    current_volunteers: number;
+    contact_email: string;
+    requirements: string | null;
+    benefits: string | null;
+    status: string;
+    created_at: string;
+    updated_at: string;
+  }> {
+    return this.request('GET', `/opportunity/${opportunityId}`);
+  }
   
   async submitApplication(data: {
     volunteerId: string;
@@ -213,6 +236,22 @@ export class VolunteerApi extends BaseClient {
   
   async getApplications(volunteerId: string): Promise<any[]> {
     return this.request<any[]>('GET', `/volunteer/${volunteerId}/applications`);
+  }
+
+  async updateVolunteerProfile(
+    volunteerId: string,
+    data: {
+      name?: string;
+      email?: string;
+      phone?: string;
+      location?: string;
+      skills?: string[];
+      interests?: string[];
+      availability?: { weekdays?: boolean; weekends?: boolean; evenings?: boolean };
+      profileImageUrl?: string;
+    }
+  ): Promise<{ id: string; profile: any; message: string; updatedAt?: string }> {
+    return this.request('PUT', `/volunteer/${volunteerId}/profile`, data);
   }
 }
 

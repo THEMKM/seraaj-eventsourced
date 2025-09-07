@@ -197,7 +197,7 @@ paths:
                 properties:
                   status:
                     type: string
-                    enum: [healthy]
+                    enum: [healthy, degraded, unhealthy]
                   timestamp:
                     type: string
                     format: date-time

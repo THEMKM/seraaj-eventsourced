@@ -22,7 +22,7 @@ export default function OpportunitiesPage() {
 
   useEffect(() => {
     // Load opportunities when component mounts
-    loadQuickMatches(20);
+    loadQuickMatches(10);
   }, [loadQuickMatches]);
 
   const handleApply = (opportunityId: string) => {
@@ -69,7 +69,7 @@ export default function OpportunitiesPage() {
             <div className="flex space-x-4">
               <PxButton 
                 variant="primary" 
-                onClick={() => loadQuickMatches(20)}
+                onClick={() => loadQuickMatches(10)}
                 disabled={isLoading}
               >
                 {isLoading ? '⏳ SCANNING...' : '🔄 REFRESH QUESTS'}
@@ -77,7 +77,7 @@ export default function OpportunitiesPage() {
               
               <PxButton 
                 variant="secondary" 
-                onClick={() => loadQuickMatches(50)}
+                onClick={() => loadQuickMatches(10)}
                 disabled={isLoading}
               >
                 🌌 SHOW MORE
@@ -100,7 +100,7 @@ export default function OpportunitiesPage() {
                   <p className="text-white text-sm mb-4">
                     Try refreshing to find new opportunities!
                   </p>
-                  <PxButton variant="primary" onClick={() => loadQuickMatches(20)}>
+                  <PxButton variant="primary" onClick={() => loadQuickMatches(10)}>
                     🔍 SEARCH FOR QUESTS
                   </PxButton>
                 </PxCard>
@@ -122,7 +122,7 @@ export default function OpportunitiesPage() {
                             <div className="space-y-2">
                               <div className="flex items-start justify-between">
                                 <h3 className="text-ink dark:text-white font-pixel text-sm leading-tight">
-                                  🏆 QUEST {match.opportunityId.toUpperCase()}
+                                  🏆 {match.opportunityTitle || `QUEST ${match.opportunityId.toUpperCase()}`}
                                 </h3>
                                 <PxBadge 
                                   variant={getMatchBadgeVariant(matchScore)} 
@@ -134,11 +134,11 @@ export default function OpportunitiesPage() {
                               </div>
                               
                               <p className="text-ink dark:text-white text-xs">
-                                🏰 {match.organizationId.toUpperCase()}
+                                🏰 {match.organizationName || match.organizationId.toUpperCase()}
                               </p>
                               
                               <p className="text-electric-teal text-xs font-pixel">
-                                📍 MENA REGION
+                                📍 Location info available in details
                               </p>
                             </div>
 

@@ -32,7 +32,7 @@ class ServiceUnavailableError(Exception):
 class ServiceRegistry:
     """Dynamic service registry with health checking"""
     
-    def __init__(self, health_check_timeout: float = 2.0, check_interval: float = 30.0):
+    def __init__(self, health_check_timeout: float = 5.0, check_interval: float = 30.0):
         self.services: Dict[str, ServiceInfo] = {}
         self.health_check_timeout = health_check_timeout
         self.check_interval = check_interval
@@ -50,18 +50,54 @@ class ServiceRegistry:
         logger.info(f"Registered service: {name} at {host}:{port}")
         
     def register_default_services(self):
-        """Register default services with standard ports"""
+        """Register default services with environment variable support"""
+        import os
+        
+        # Use environment variables with fallbacks
         default_services = [
-            ("applications", "localhost", 8001),
-            ("matching", "localhost", 8003), 
-            ("auth", "localhost", 8004),
-            ("volunteers", "localhost", 8005),
-            ("opportunities", "localhost", 8006),
-            ("organizations", "localhost", 8007)
+            ("applications", 
+             os.getenv("APPLICATIONS_SERVICE_HOST", "localhost"), 
+             int(os.getenv("APPLICATIONS_SERVICE_PORT", "8001"))),
+            ("matching", 
+             os.getenv("MATCHING_SERVICE_HOST", "localhost"), 
+             int(os.getenv("MATCHING_SERVICE_PORT", "8003"))),
+            ("auth", 
+             os.getenv("AUTH_SERVICE_HOST", "localhost"), 
+             int(os.getenv("AUTH_SERVICE_PORT", "8004"))),
+            ("volunteers", 
+             os.getenv("VOLUNTEERS_SERVICE_HOST", "localhost"), 
+             int(os.getenv("VOLUNTEERS_SERVICE_PORT", "8005"))),
+            ("opportunities", 
+             os.getenv("OPPORTUNITIES_SERVICE_HOST", "localhost"), 
+             int(os.getenv("OPPORTUNITIES_SERVICE_PORT", "8006"))),
+            ("organizations", 
+             os.getenv("ORGANIZATIONS_SERVICE_HOST", "localhost"), 
+             int(os.getenv("ORGANIZATIONS_SERVICE_PORT", "8007")))
         ]
         
+        # Validate for port conflicts first
+        port_map = {}
+        conflicts = []
+        
         for name, host, port in default_services:
-            self.register_service(name, host, port)
+            addr = f"{host}:{port}"
+            if addr in port_map:
+                conflicts.append(f"Port conflict: {name} and {port_map[addr]} both trying to use {addr}")
+            port_map[addr] = name
+        
+        if conflicts:
+            logger.error("Port conflicts detected:")
+            for conflict in conflicts:
+                logger.error(f"  {conflict}")
+            raise ValueError(f"Port conflicts prevent service registration: {'; '.join(conflicts)}")
+        
+        # Register services
+        for name, host, port in default_services:
+            # Build health endpoint URL
+            health_endpoint = f"http://{host}:{port}/health"
+            self.register_service(name, host, port, health_endpoint)
+            
+        logger.info(f"Registered {len(default_services)} services successfully")
     
     async def get_service_url(self, service_name: str) -> str:
         """Get service URL with health check"""
@@ -81,9 +117,23 @@ class ServiceRegistry:
         try:
             async with httpx.AsyncClient(timeout=self.health_check_timeout) as client:
                 response = await client.get(service.health_endpoint)
-                is_healthy = response.status_code == 200
-                service.status = 'healthy' if is_healthy else 'unhealthy'
-                return is_healthy
+                if response.status_code != 200:
+                    service.status = 'unhealthy'
+                    return False
+                
+                # Check response body for status
+                try:
+                    health_data = response.json()
+                    status = health_data.get('status', 'unknown')
+                    # Accept both "healthy" and "degraded" as usable
+                    is_healthy = status in ['healthy', 'degraded']
+                    service.status = status if status in ['healthy', 'degraded', 'unhealthy'] else 'unknown'
+                    return is_healthy
+                except Exception:
+                    # If we can't parse JSON, assume healthy if HTTP 200
+                    service.status = 'healthy'
+                    return True
+                    
         except Exception as e:
             logger.debug(f"Health check failed for {service.name}: {e}")
             service.status = 'unhealthy'

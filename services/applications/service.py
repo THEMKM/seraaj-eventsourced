@@ -163,3 +163,7 @@ class ApplicationService:
     async def get_opportunity_applications(self, opportunity_id: str) -> List[Application]:
         """Get all applications for an opportunity"""
         return await self.repository.find_by_opportunity(opportunity_id)
+    
+    async def get_organization_stats(self, organization_id: str) -> dict:
+        """Get application statistics for an organization"""
+        return await self.repository.get_organization_stats(organization_id)

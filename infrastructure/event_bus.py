@@ -79,7 +79,10 @@ class RedisEventBus:
                 self.connection_pool = redis.ConnectionPool.from_url(
                     self.redis_url,
                     max_connections=20,
-                    retry_on_timeout=True
+                    retry_on_timeout=True,
+                    socket_timeout=2.0,
+                    socket_connect_timeout=3.0,
+                    health_check_interval=30
                 )
             
             if not self.redis_client:

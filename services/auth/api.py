@@ -30,6 +30,8 @@ from services.shared.logging_config import (
     log_performance_metric
 )
 from .service import AuthService
+from .profile_models import VolunteerProfile as AuthVolunteerProfile, UpdateVolunteerProfileRequest
+from .profile_repository import ProfileRepository
 
 # Temporary reset password request without verification (MVP only)
 # TODO(security): Replace with token-based reset flow with email verification.
@@ -62,6 +64,9 @@ app.add_middleware(
 
 def get_auth_service() -> AuthService:
     return AuthService()
+
+def get_profile_repository() -> ProfileRepository:
+    return ProfileRepository()
 
 
 @app.get("/health")
@@ -113,6 +118,49 @@ async def readiness_check():
         "timestamp": datetime.now(UTC).isoformat(),
         "checks": checks
     }
+
+
+@app.get("/auth/profile", response_model=AuthVolunteerProfile,
+         responses={401: {"model": ApiError, "description": "Invalid or missing token"}})
+async def get_profile(
+    req: Request,
+    authorization: str | None = Header(None),
+    service: AuthService = Depends(get_auth_service),
+    repo: ProfileRepository = Depends(get_profile_repository)
+):
+    """Return the authenticated user's volunteer profile. Creates a default if absent."""
+    if not authorization or not authorization.startswith("Bearer "):
+        err = StandardErrorResponse(error="MISSING_TOKEN", message="Authorization header required", code=status.HTTP_401_UNAUTHORIZED)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=err.model_dump())
+
+    access_token = authorization[7:]
+    user = await service.get_current_user(access_token)
+
+    # Ensure a profile exists; create default if needed
+    profile = repo.get_by_user_id(user.id)
+    if not profile:
+        profile = repo.upsert_for_user(user.id, base_name=user.name, base_email=user.email)
+    return profile
+
+
+@app.put("/auth/profile", response_model=AuthVolunteerProfile,
+         responses={401: {"model": ApiError, "description": "Invalid or missing token"}})
+async def update_profile(
+    request: UpdateVolunteerProfileRequest,
+    req: Request,
+    authorization: str | None = Header(None),
+    service: AuthService = Depends(get_auth_service),
+    repo: ProfileRepository = Depends(get_profile_repository)
+):
+    """Update fields on the authenticated user's volunteer profile and persist them."""
+    if not authorization or not authorization.startswith("Bearer "):
+        err = StandardErrorResponse(error="MISSING_TOKEN", message="Authorization header required", code=status.HTTP_401_UNAUTHORIZED)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=err.model_dump())
+
+    access_token = authorization[7:]
+    user = await service.get_current_user(access_token)
+    profile = repo.upsert_for_user(user.id, base_name=user.name, base_email=user.email, update=request)
+    return profile
 
 @app.post("/auth/reset-password")
 async def reset_password(request: ResetPasswordRequest, req: Request, service: AuthService = Depends(get_auth_service)):

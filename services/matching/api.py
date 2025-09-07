@@ -50,6 +50,7 @@ async def quick_match(
     volunteer_id: str = Query(..., description="Volunteer ID to match"),
     limit: int = Query(3, description="Number of matches to return", ge=1, le=10),
     request: Request = None,
+    authorization: str | None = Header(default=None),
     _token: dict | None = Depends(verify_service_token)
 ):
     """Generate quick match suggestions (top matches)"""
@@ -65,7 +66,7 @@ async def quick_match(
     )
     
     try:
-        suggestions = await service.quick_match(volunteer_id, limit)
+        suggestions = await service.quick_match(volunteer_id, limit, authorization)
         
         if not suggestions:
             log_structured(
@@ -128,6 +129,7 @@ async def generate_matches(
     category: Optional[str] = Query(None, description="Filter by opportunity category"),
     limit: int = Query(10, description="Number of matches to return", ge=1, le=50),
     request: Request = None,
+    authorization: str | None = Header(default=None),
     _token: dict | None = Depends(verify_service_token)
 ):
     """Generate comprehensive match suggestions"""
@@ -148,7 +150,7 @@ async def generate_matches(
     )
     
     try:
-        suggestions = await service.generate_matches(volunteer_id, filters, limit)
+        suggestions = await service.generate_matches(volunteer_id, filters, limit, authorization)
         
         duration_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
         avg_score = sum(s.score for s in suggestions) / len(suggestions) if suggestions else 0

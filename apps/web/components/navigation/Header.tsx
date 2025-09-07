@@ -3,9 +3,19 @@
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { PxButton } from '@seraaj/ui';
+import { AvatarDisplay } from '@/components/avatar/AvatarSelector';
+import { AvatarConfig, AvatarClass, AvatarPose, calculateAvatarClass } from '@/components/avatar/AvatarSystem';
 
 export function Header() {
   const { isAuthenticated, user, logout, isLoading } = useAuth();
+
+  // Create basic avatar configuration for header
+  const headerAvatarConfig: AvatarConfig = {
+    class: AvatarClass.HERO,
+    level: 1,
+    pose: AvatarPose.DEFAULT,
+    accessories: []
+  };
 
   return (
     <header className="bg-deep-indigo clip-px border-px border-electric-teal shadow-px">
@@ -55,7 +65,14 @@ export function Header() {
             {isLoading ? (
               <div className="text-xs text-white font-pixel">⏳ LOADING...</div>
             ) : isAuthenticated && user ? (
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-3">
+                <AvatarDisplay
+                  config={headerAvatarConfig}
+                  size="sm"
+                  showLevel={false}
+                  clickable={false}
+                  className="animate-pulse-slow"
+                />
                 <span className="text-xs text-primary font-pixel">
                   🎉 {user.name?.toUpperCase()}
                 </span>

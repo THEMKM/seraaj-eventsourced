@@ -15,7 +15,7 @@ class ServiceConfig:
     """Configuration for a service"""
     name: str
     default_port: int
-    default_host: str = "127.0.0.1"
+    default_host: str = "localhost"
     environment_port_var: Optional[str] = None
     environment_host_var: Optional[str] = None
 
@@ -196,11 +196,11 @@ class PortConfigManager:
         # Check for conflicts
         conflicts = cls.validate_port_conflicts()
         if conflicts:
-            print("\n⚠️  PORT CONFLICTS DETECTED:")
+            print("\nPORT CONFLICTS DETECTED:")
             for address, conflict in conflicts.items():
                 print(f"  {address}: {conflict}")
         else:
-            print("\n✅ No port conflicts detected")
+            print("\nNo port conflicts detected")
         
         print("=" * 30)
 

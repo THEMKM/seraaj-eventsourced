@@ -9,6 +9,11 @@ import { Header } from '@/components/navigation/Header';
 import { PxButton, PxCard, PxChip, PxLoading, PxModal } from '@seraaj/ui';
 import { createAuthenticatedVolunteerApi } from '@/lib/bff';
 import { VolunteerDashboardResponse } from '@seraaj/sdk-bff';
+import { XPProgressBar } from '@/components/dashboard/XPProgressBar';
+import { AchievementBadge, Achievement } from '@/components/dashboard/AchievementBadge';
+import { calculateTotalXP, calculateLevel, getXPForNextLevel, generateAchievements, calculateImpactStats } from '@/utils/gamification';
+import { AvatarDisplay, AvatarSelector } from '@/components/avatar/AvatarSelector';
+import { AvatarConfig, AvatarClass, AvatarPose, calculateAvatarClass, getUnlockedAccessories } from '@/components/avatar/AvatarSystem';
 
 export default function DashboardPage() {
   const { user, tokens } = useAuth();
@@ -18,6 +23,15 @@ export default function DashboardPage() {
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(true);
   const [selectedOpportunityId, setSelectedOpportunityId] = useState<string | null>(null);
   const [applicationMessage, setApplicationMessage] = useState('');
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [gamificationData, setGamificationData] = useState<{
+    totalXP: number;
+    level: number;
+    nextLevelXP: number;
+    impactStats: ReturnType<typeof calculateImpactStats>;
+  } | null>(null);
+  const [avatarConfig, setAvatarConfig] = useState<AvatarConfig | null>(null);
+  const [isAvatarSelectorOpen, setIsAvatarSelectorOpen] = useState(false);
 
   useEffect(() => {
     const loadDashboard = async () => {
@@ -28,6 +42,26 @@ export default function DashboardPage() {
         const volunteerApi = createAuthenticatedVolunteerApi(tokens.accessToken);
         const dashboardData = await volunteerApi.getVolunteerDashboard(user.id);
         setDashboard(dashboardData);
+
+        // Calculate gamification data
+        const totalXP = calculateTotalXP(dashboardData);
+        const level = calculateLevel(totalXP);
+        const nextLevelXP = getXPForNextLevel(level);
+        const impactStats = calculateImpactStats(dashboardData);
+        
+        setGamificationData({ totalXP, level, nextLevelXP, impactStats });
+        setAchievements(generateAchievements(dashboardData));
+
+        // Initialize avatar configuration
+        const avatarClass = calculateAvatarClass(level, generateAchievements(dashboardData));
+        const unlockedAccessories = getUnlockedAccessories(generateAchievements(dashboardData), level);
+        const defaultAvatarConfig: AvatarConfig = {
+          class: avatarClass,
+          level: level,
+          pose: AvatarPose.DEFAULT,
+          accessories: unlockedAccessories.slice(0, 2) // Show first 2 unlocked accessories
+        };
+        setAvatarConfig(defaultAvatarConfig);
       } catch (error) {
         console.error('Failed to load dashboard:', error);
         showError('Failed to load dashboard data');
@@ -40,7 +74,7 @@ export default function DashboardPage() {
   }, [user, tokens, showError]);
 
   const handleQuickMatch = async () => {
-    await loadQuickMatches(10);
+    await loadQuickMatches(8);
   };
 
   const handleApply = (opportunityId: string) => {
@@ -61,10 +95,25 @@ export default function DashboardPage() {
         const volunteerApi = createAuthenticatedVolunteerApi(tokens.accessToken);
         const dashboardData = await volunteerApi.getVolunteerDashboard(user.id);
         setDashboard(dashboardData);
+
+        // Recalculate gamification data
+        const totalXP = calculateTotalXP(dashboardData);
+        const level = calculateLevel(totalXP);
+        const nextLevelXP = getXPForNextLevel(level);
+        const impactStats = calculateImpactStats(dashboardData);
+        
+        setGamificationData({ totalXP, level, nextLevelXP, impactStats });
+        setAchievements(generateAchievements(dashboardData));
       } catch (error) {
         console.error('Failed to reload dashboard:', error);
       }
     }
+  };
+
+  const handleAvatarSave = (newConfig: AvatarConfig) => {
+    setAvatarConfig(newConfig);
+    // TODO: Save avatar config to user profile/preferences
+    console.log('Avatar saved:', newConfig);
   };
 
   return (
@@ -74,18 +123,109 @@ export default function DashboardPage() {
         
         <main className="max-w-6xl mx-auto p-6">
           <div className="mb-8">
-            <h1 className="text-3xl font-pixel text-primary dark:text-neon-cyan mb-2">
-              🏆 HERO DASHBOARD 🏆
-            </h1>
-            <p className="text-white text-lg">
-              Welcome back, <span className="text-pixel-coral font-pixel">{user?.name?.toUpperCase()}</span>! 
-              🚀 Ready for your next quest?
-            </p>
+            <div className="flex items-center gap-6 mb-4">
+              <div>
+                <h1 className="text-3xl font-pixel text-primary dark:text-neon-cyan mb-2">
+                  🏆 HERO DASHBOARD 🏆
+                </h1>
+                <p className="text-white text-lg">
+                  Welcome back, <span className="text-pixel-coral font-pixel">{user?.name?.toUpperCase()}</span>! 
+                  🚀 Ready for your next quest?
+                </p>
+              </div>
+              
+              {/* Avatar Display */}
+              {avatarConfig && gamificationData && !isLoadingDashboard && (
+                <div className="flex-shrink-0">
+                  <AvatarDisplay
+                    config={avatarConfig}
+                    size="lg"
+                    showLevel={true}
+                    clickable={true}
+                    onClick={() => setIsAvatarSelectorOpen(true)}
+                    className="animate-bounce-slow"
+                  />
+                </div>
+              )}
+            </div>
+            
+            {/* XP Progress Bar */}
+            {gamificationData && !isLoadingDashboard && (
+              <div className="mt-4">
+                <XPProgressBar
+                  currentXP={gamificationData.totalXP}
+                  level={gamificationData.level}
+                  nextLevelXP={gamificationData.nextLevelXP}
+                />
+              </div>
+            )}
           </div>
 
           <div className="grid lg:grid-cols-2 gap-6">
             {/* Profile & Applications */}
             <div className="space-y-6">
+              {/* Impact Stats Card */}
+              {gamificationData && !isLoadingDashboard && (
+                <PxCard variant="glow">
+                  <div className="flex items-center mb-4">
+                    <span className="text-2xl mr-2">📊</span>
+                    <h2 className="text-lg font-pixel text-sunBurst mb-0">IMPACT STATS</h2>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-center">
+                    <div>
+                      <div className="text-2xl font-pixel text-electric-teal">
+                        {gamificationData.impactStats.totalApplications}
+                      </div>
+                      <div className="text-white text-xs font-pixel">APPLICATIONS</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-pixel text-pixel-coral">
+                        {gamificationData.impactStats.estimatedVolunteerHours}
+                      </div>
+                      <div className="text-white text-xs font-pixel">HOURS COMMITTED</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-pixel text-neon-cyan">
+                        {gamificationData.impactStats.organizationsHelped}
+                      </div>
+                      <div className="text-white text-xs font-pixel">OPPORTUNITIES</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-pixel text-sunBurst">
+                        {gamificationData.impactStats.impactScore}
+                      </div>
+                      <div className="text-white text-xs font-pixel">IMPACT SCORE</div>
+                    </div>
+                  </div>
+                </PxCard>
+              )}
+
+              {/* Achievements Card */}
+              {achievements.length > 0 && !isLoadingDashboard && (
+                <PxCard variant="default">
+                  <div className="flex items-center mb-4">
+                    <span className="text-2xl mr-2">🏅</span>
+                    <h2 className="text-lg font-pixel text-primary mb-0">ACHIEVEMENTS</h2>
+                  </div>
+                  <div className="grid grid-cols-5 gap-3">
+                    {achievements.slice(0, 10).map((achievement) => (
+                      <AchievementBadge 
+                        key={achievement.id} 
+                        achievement={achievement}
+                        size="md"
+                      />
+                    ))}
+                  </div>
+                  {achievements.length > 10 && (
+                    <div className="mt-3 text-center">
+                      <span className="text-electric-teal font-pixel text-sm">
+                        +{achievements.length - 10} more achievements
+                      </span>
+                    </div>
+                  )}
+                </PxCard>
+              )}
+
               <PxCard variant="default">
                 <div className="flex items-center mb-4">
                   <span className="text-2xl mr-2">🎆</span>
@@ -254,6 +394,19 @@ export default function DashboardPage() {
             </div>
           </div>
         </PxModal>
+
+        {/* Avatar Customization Modal */}
+        {avatarConfig && gamificationData && (
+          <AvatarSelector
+            currentConfig={avatarConfig}
+            userLevel={gamificationData.level}
+            achievements={achievements}
+            onConfigChange={setAvatarConfig}
+            onSave={handleAvatarSave}
+            isOpen={isAvatarSelectorOpen}
+            onClose={() => setIsAvatarSelectorOpen(false)}
+          />
+        )}
       </div>
     </ProtectedRoute>
   );

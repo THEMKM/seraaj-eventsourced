@@ -235,12 +235,19 @@ async def check_redis_connection() -> bool:
     try:
         from infrastructure.event_bus import RedisEventBus
         bus = RedisEventBus()
-        # Try to ensure connection (which includes ping)
-        connected = await bus._ensure_connection()
+        # Try to ensure connection with timeout
+        connected = await asyncio.wait_for(bus._ensure_connection(), timeout=4.0)
         if connected:
-            await bus.close()  # Clean up
+            try:
+                await bus.close()  # Clean up
+            except Exception:
+                pass  # Ignore cleanup errors
         return connected
-    except Exception:
+    except asyncio.TimeoutError:
+        logger.warning("Redis connection check timed out")
+        return False
+    except Exception as e:
+        logger.debug(f"Redis connection check failed: {e}")
         return False
 
 
@@ -299,7 +306,7 @@ def create_service_health_checker(service_name: str) -> HealthChecker:
     checker.add_dependency(
         "redis_event_bus",
         check_redis_connection,
-        timeout_seconds=3.0,
+        timeout_seconds=5.0,  # Increased timeout for Redis connection
         critical=False  # Redis failure is degraded, not unhealthy
     )
     

@@ -90,7 +90,17 @@
       "WebSearch",
       "Bash(pip freeze)",
       "Bash(rg:*)",
-      "Bash(NEXT_PUBLIC_BFF_URL=http://localhost:8000/api pnpm dev:web)"
+      "Bash(NEXT_PUBLIC_BFF_URL=http://localhost:8000/api pnpm dev:web)",
+      "Bash(export SERAAJ_AGENT=GENERAL)",
+      "Bash(uvicorn:*)",
+      "Bash(for i in {1..10})",
+      "Bash(do echo -n \"Test $i: \")",
+      "Bash(done)",
+      "Read(C:\\Users\\Mohamad\\Documents\\Claude\\Seraaj/**)",
+      "Read(C:\\Users\\Mohamad\\Documents\\Claude\\Seraaj/**)",
+      "Read(C:\\Users\\Mohamad\\Documents\\Claude\\Seraaj\\apps\\web\\components\\onboarding/**)",
+      "Bash(dir services)",
+      "Bash(redis-cli:*)"
     ],
     "deny": []
   }

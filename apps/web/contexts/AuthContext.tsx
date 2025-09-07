@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, AuthTokens, UserRole } from '@seraaj/sdk-bff';
-import { authApi } from '@/lib/bff';
+import { authApi, authenticatedAuthApi } from '@/lib/bff';
 
 interface AuthContextType {
   user: User | null;
@@ -21,11 +21,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [tokens, setTokens] = useState<AuthTokens | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const didInitRef = React.useRef(false);
 
   // Initialize auth state from localStorage
   useEffect(() => {
     const initAuth = async () => {
       try {
+        if (didInitRef.current) return;
+        didInitRef.current = true;
         const storedTokens = localStorage.getItem('seraaj_tokens');
         if (storedTokens) {
           const parsedTokens: AuthTokens = JSON.parse(storedTokens);
@@ -45,16 +48,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           } else {
             // Token is valid, get current user
             try {
-              const currentUser = await authApi.getCurrentUser();
+              const currentUser = await authenticatedAuthApi.getCurrentUser();
               await updateAuthState(currentUser, parsedTokens);
             } catch (error) {
-              console.error('Failed to get current user:', error);
+              // Clear invalid session without noisy logs
               logout();
             }
           }
         }
       } catch (error) {
-        console.error('Failed to initialize auth:', error);
+        // Suppress initialization noise in dev
       } finally {
         setIsLoading(false);
       }
@@ -80,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else if (tokenData) {
       // Fetch user data if not provided
       try {
-        const currentUser = await authApi.getCurrentUser();
+        const currentUser = await authenticatedAuthApi.getCurrentUser();
         setUser(currentUser);
       } catch (error) {
         console.error('Failed to fetch user data:', error);

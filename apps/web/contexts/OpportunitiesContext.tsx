@@ -33,6 +33,8 @@ interface MatchResponse {
   explanation: string[];
   generatedAt: string;
   status: string;
+  opportunityTitle?: string;
+  organizationName?: string;
 }
 
 interface OpportunitiesContextType {
@@ -63,13 +65,13 @@ export function OpportunitiesProvider({ children }: { children: ReactNode }) {
       // Use the SDK but cast the result since there's a contract mismatch
       const volunteerId = user?.id || 'test-volunteer-123';
       
-      const matches = await volunteerApi.getQuickMatch({
+      const rawMatches = await volunteerApi.getQuickMatch({
         volunteerId,
         limit
-      }) as unknown as MatchResponse[]; // Cast due to contract mismatch
+      }) as unknown as any[];
       
-      setOpportunities(matches || []);
-      showSuccess(`Found ${matches?.length || 0} quest matches for you! 🎆`);
+      setOpportunities(rawMatches || []);
+      showSuccess(`Found ${rawMatches?.length || 0} quest matches for you! 🎆`);
     } catch (error) {
       console.error('Failed to load opportunities:', error);
       showError('Failed to load opportunities');
@@ -82,29 +84,26 @@ export function OpportunitiesProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
       
-      // Find from existing opportunities using opportunityId (not id)
-      const opportunity = opportunities.find(opp => opp.opportunityId === opportunityId);
-      if (opportunity) {
-        setSelectedOpportunity({
-          id: opportunity.opportunityId,
-          title: `Quest ${opportunity.opportunityId.toUpperCase()}`,
-          description: `An exciting volunteer opportunity with a ${Math.round(opportunity.score * 100)}% match score!`,
-          organizationName: `Organization ${opportunity.organizationId.toUpperCase()}`,
-          location: 'MENA Region',
-          requirements: opportunity.explanation, // explanation maps to requirements
-          timeCommitment: `${Math.round(opportunity.scoreComponents.availability * 100)}% time commitment`,
-          isActive: opportunity.status === 'pending'
-        } as OpportunityDetails);
-      } else {
-        showError('Quest not found in your matches');
-      }
+      // Get real opportunity details from the API
+      const opportunityDetails = await volunteerApi.getOpportunityDetails(opportunityId);
+      
+      setSelectedOpportunity({
+        id: opportunityDetails.id,
+        title: opportunityDetails.title,
+        description: opportunityDetails.description,
+        organizationName: `Organization ${opportunityDetails.organization_id}`, // TODO: Get real org name when organizations API is available
+        location: opportunityDetails.is_remote ? 'Remote' : opportunityDetails.location,
+        requirements: opportunityDetails.requirements ? [opportunityDetails.requirements] : [],
+        timeCommitment: opportunityDetails.time_commitment || 'Time commitment not specified',
+        isActive: opportunityDetails.status === 'active'
+      } as OpportunityDetails);
     } catch (error) {
       console.error('Failed to load opportunity details:', error);
       showError('Failed to load opportunity details');
     } finally {
       setIsLoading(false);
     }
-  }, [opportunities, showError]);
+  }, [showError]);
 
   const applyToOpportunity = useCallback(async (opportunityId: string, coverLetter = '') => {
     try {

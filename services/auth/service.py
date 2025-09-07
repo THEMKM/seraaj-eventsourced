@@ -2,7 +2,7 @@
 Authentication service implementing JWT-based authentication
 """
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional
 from uuid import uuid4
 
@@ -35,7 +35,7 @@ class AuthService:
     
     def _generate_tokens(self, user: User) -> AuthTokens:
         """Generate access and refresh tokens for user"""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         
         # Access token payload
         access_payload = {
@@ -91,7 +91,7 @@ class AuthService:
         hashed_password = self._hash_password(password)
         
         # Create user data
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         user_data = {
             'id': str(uuid4()),
             'email': email,

@@ -415,3 +415,83 @@ class ApplicationRepository:
                 'backend': 'file',
                 'cache_size': len(self._cache) if hasattr(self, '_cache') else 0
             }
+
+    async def get_organization_stats(self, organization_id: str) -> Dict[str, int]:
+        """Get application statistics for a specific organization"""
+        if self.storage_backend == "postgres":
+            return await self._get_organization_stats_postgres(organization_id)
+        else:
+            return await self._get_organization_stats_file(organization_id)
+    
+    async def _get_organization_stats_postgres(self, organization_id: str) -> Dict[str, int]:
+        """Get organization statistics using PostgreSQL"""
+        try:
+            from sqlalchemy import text
+            async with self.db_connection.get_session() as session:
+                # Get all applications for opportunities belonging to this organization
+                query = text("""
+                    SELECT status, COUNT(*) as count
+                    FROM applications 
+                    WHERE organization_id = :organization_id 
+                    GROUP BY status
+                """)
+                result = await session.execute(query, {"organization_id": organization_id})
+                rows = result.fetchall()
+                
+                # Initialize stats
+                stats = {
+                    "totalApplications": 0,
+                    "pendingReview": 0,
+                    "approved": 0,
+                    "rejected": 0
+                }
+                
+                # Count by status
+                for row in rows:
+                    status = row.status.lower()
+                    count = row.count
+                    stats["totalApplications"] += count
+                    
+                    if status in ['submitted', 'reviewing']:
+                        stats["pendingReview"] += count
+                    elif status in ['accepted', 'approved']:
+                        stats["approved"] += count
+                    elif status in ['rejected']:
+                        stats["rejected"] += count
+                
+                return stats
+        except Exception as e:
+            print(f"[WARNING] Error getting organization stats: {e}")
+            return {"totalApplications": 0, "pendingReview": 0, "approved": 0, "rejected": 0}
+    
+    async def _get_organization_stats_file(self, organization_id: str) -> Dict[str, int]:
+        """Get organization statistics using file storage"""
+        try:
+            # Filter applications by organization
+            org_applications = [
+                app for app in self._cache.values()
+                if hasattr(app, 'organizationId') and app.organizationId == organization_id
+            ]
+            
+            # Initialize stats
+            stats = {
+                "totalApplications": len(org_applications),
+                "pendingReview": 0,
+                "approved": 0,
+                "rejected": 0
+            }
+            
+            # Count by status
+            for app in org_applications:
+                status = app.status.lower()
+                if status in ['submitted', 'reviewing']:
+                    stats["pendingReview"] += 1
+                elif status in ['accepted', 'approved']:
+                    stats["approved"] += 1
+                elif status in ['rejected']:
+                    stats["rejected"] += 1
+            
+            return stats
+        except Exception as e:
+            print(f"[WARNING] Error getting organization stats from file: {e}")
+            return {"totalApplications": 0, "pendingReview": 0, "approved": 0, "rejected": 0}

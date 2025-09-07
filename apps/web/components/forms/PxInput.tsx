@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useId } from 'react';
 import { clsx } from 'clsx';
 
 export interface PxInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> {
@@ -18,7 +18,8 @@ export const PxInput = forwardRef<HTMLInputElement, PxInputProps>(function PxInp
   ...props
 }, ref) {
   const hasError = error || variant === 'error';
-  const inputId = id || `px-input-${Math.random().toString(36).substr(2, 9)}`;
+  const autoId = useId();
+  const inputId = id || autoId;
   
   return (
     <div className="space-y-1">

@@ -7,6 +7,7 @@ from datetime import datetime, UTC
 from services.shared.models import MatchSuggestion
 from .algorithm import MatchingAlgorithm
 from .repository import MatchRepository
+from .adapters import AuthServiceAdapter, OpportunitiesServiceAdapter
 
 try:
     from infrastructure.event_bus import RedisEventBus
@@ -25,6 +26,12 @@ class MatchingService:
         self.algorithm = MatchingAlgorithm()
         self.repository = MatchRepository()
         
+        # Service adapters for external data
+        auth_service_url = os.getenv("AUTH_SERVICE_URL", "http://localhost:8004")
+        opportunities_service_url = os.getenv("OPPORTUNITIES_SERVICE_URL", "http://localhost:8002")
+        self.auth_adapter = AuthServiceAdapter(auth_service_url)
+        self.opportunities_adapter = OpportunitiesServiceAdapter(opportunities_service_url)
+        
         # Event publishing setup
         self.use_redis = os.getenv("USE_REDIS_EVENTS", "true").lower() == "true"
         self.redis_bus = None
@@ -39,15 +46,22 @@ class MatchingService:
     async def quick_match(
         self,
         volunteer_id: str,
-        limit: int = 3
+        limit: int = 3,
+        authorization: str = None
     ) -> List[MatchSuggestion]:
         """Generate quick match suggestions (top matches)"""
         
-        # Get volunteer profile
-        volunteer = await self._get_volunteer(volunteer_id)
+        # Get volunteer profile from Auth service
+        volunteer = await self.auth_adapter.get_volunteer_profile(volunteer_id, authorization)
+        if not volunteer:
+            logger.warning(f"Volunteer profile not found: {volunteer_id}")
+            return []
         
-        # Get available opportunities
-        opportunities = await self._get_available_opportunities()
+        # Convert profile to internal format
+        volunteer = self._convert_volunteer_profile(volunteer)
+        
+        # Get available opportunities from Opportunities service
+        opportunities = await self.opportunities_adapter.get_available_opportunities()
         
         # Run matching algorithm
         matches = self.algorithm.rank_opportunities(
@@ -84,12 +98,22 @@ class MatchingService:
         self,
         volunteer_id: str,
         filters: Dict[str, Any] = None,
-        limit: int = 10
+        limit: int = 10,
+        authorization: str = None
     ) -> List[MatchSuggestion]:
         """Generate comprehensive match suggestions"""
         
-        volunteer = await self._get_volunteer(volunteer_id)
-        opportunities = await self._get_available_opportunities(filters)
+        # Get volunteer profile from Auth service
+        volunteer = await self.auth_adapter.get_volunteer_profile(volunteer_id, authorization)
+        if not volunteer:
+            logger.warning(f"Volunteer profile not found: {volunteer_id}")
+            return []
+        
+        # Convert profile to internal format
+        volunteer = self._convert_volunteer_profile(volunteer)
+        
+        # Get available opportunities from Opportunities service
+        opportunities = await self.opportunities_adapter.get_available_opportunities(filters)
         
         matches = self.algorithm.rank_opportunities(
             volunteer,
@@ -122,118 +146,40 @@ class MatchingService:
         """Get existing suggestions for a volunteer"""
         return await self.repository.find_by_volunteer(volunteer_id)
     
-    async def _get_volunteer(self, volunteer_id: str) -> Dict[str, Any]:
-        """Get volunteer data (mock for MVP)"""
-        # Mock volunteer profiles for testing
-        volunteers = {
-            "vol1": {
-                "id": "vol1",
-                "skills": ["teaching", "administrative", "communication"],
-                "location": {"latitude": 30.0444, "longitude": 31.2357},  # Cairo
-                "availability": ["weekend-morning", "weekend-afternoon", "weekday-evening"]
-            },
-            "vol2": {
-                "id": "vol2",
-                "skills": ["medical", "counseling"],
-                "location": {"latitude": 30.0626, "longitude": 31.2497},  # Near Cairo
-                "availability": ["weekday-morning", "weekday-afternoon"]
-            },
-            "vol3": {
-                "id": "vol3",
-                "skills": ["technical", "programming", "design"],
-                "location": {"latitude": 31.2001, "longitude": 29.9187},  # Alexandria
-                "availability": ["weekend-morning", "weekend-evening"]
-            }
+    def _convert_volunteer_profile(self, profile: Dict[str, Any]) -> Dict[str, Any]:
+        """Convert volunteer profile from Auth service to internal matching format"""
+        # Extract location coordinates (default to Cairo if not specified)
+        location = {"latitude": 30.0444, "longitude": 31.2357}
+        if profile.get("location"):
+            # For MVP, use simple location mapping
+            location_str = profile["location"].lower()
+            if "alexandria" in location_str:
+                location = {"latitude": 31.2001, "longitude": 29.9187}
+            elif "giza" in location_str:
+                location = {"latitude": 30.0131, "longitude": 31.2089}
+        
+        # Convert availability structure
+        availability = []
+        if profile.get("availability"):
+            avail = profile["availability"]
+            if avail.get("weekdays"):
+                availability.extend(["weekday-morning", "weekday-afternoon"])
+            if avail.get("weekends"):
+                availability.extend(["weekend-morning", "weekend-afternoon"])
+            if avail.get("evenings"):
+                availability.append("weekday-evening")
+        
+        # Default availability if none specified
+        if not availability:
+            availability = ["weekend-morning"]
+        
+        return {
+            "id": profile.get("id") or profile.get("userId"),
+            "skills": profile.get("skills", []),
+            "location": location,
+            "availability": availability
         }
-        
-        # Default volunteer if not found
-        return volunteers.get(volunteer_id, {
-            "id": volunteer_id,
-            "skills": ["general"],
-            "location": {"latitude": 30.0444, "longitude": 31.2357},
-            "availability": ["weekend-morning"]
-        })
     
-    async def _get_available_opportunities(
-        self,
-        filters: Dict[str, Any] = None
-    ) -> List[Dict[str, Any]]:
-        """Get available opportunities (mock for MVP)"""
-        opportunities = [
-            {
-                "id": "550e8400-e29b-41d4-a716-446655440001",
-                "organizationId": "660e8400-e29b-41d4-a716-446655440001",
-                "title": "Teaching Assistant - Mathematics",
-                "description": "Help students with math homework",
-                "requiredSkills": ["teaching", "communication"],
-                "timeSlots": ["weekend-morning", "weekend-afternoon"],
-                "location": {"latitude": 30.0626, "longitude": 31.2497},  # 2km from Cairo center
-                "category": "education"
-            },
-            {
-                "id": "550e8400-e29b-41d4-a716-446655440002",
-                "organizationId": "660e8400-e29b-41d4-a716-446655440002",
-                "title": "Medical Volunteer",
-                "description": "Assist in health clinic",
-                "requiredSkills": ["medical"],
-                "timeSlots": ["weekday-morning", "weekday-afternoon"],
-                "location": {"latitude": 30.0500, "longitude": 31.2333},  # 1km from Cairo center
-                "category": "health"
-            },
-            {
-                "id": "550e8400-e29b-41d4-a716-446655440003",
-                "organizationId": "660e8400-e29b-41d4-a716-446655440001",
-                "title": "Administrative Support",
-                "description": "Help with office tasks and organization",
-                "requiredSkills": ["administrative", "communication"],
-                "timeSlots": ["weekend-morning", "weekday-evening"],
-                "location": {"latitude": 30.0450, "longitude": 31.2350},  # Very close to Cairo
-                "category": "administrative"
-            },
-            {
-                "id": "550e8400-e29b-41d4-a716-446655440004",
-                "organizationId": "660e8400-e29b-41d4-a716-446655440003",
-                "title": "Website Development",
-                "description": "Build website for NGO",
-                "requiredSkills": ["technical", "programming", "design"],
-                "timeSlots": ["weekend-morning", "weekend-evening"],
-                "location": {"latitude": 31.2100, "longitude": 29.9300},  # Alexandria
-                "category": "technology"
-            },
-            {
-                "id": "550e8400-e29b-41d4-a716-446655440005",
-                "organizationId": "660e8400-e29b-41d4-a716-446655440002",
-                "title": "Counseling Support",
-                "description": "Provide emotional support to patients",
-                "requiredSkills": ["counseling", "communication"],
-                "timeSlots": ["weekday-afternoon", "weekend-afternoon"],
-                "location": {"latitude": 30.0400, "longitude": 31.2400},  # Close to Cairo
-                "category": "health"
-            },
-            {
-                "id": "550e8400-e29b-41d4-a716-446655440006",
-                "organizationId": "660e8400-e29b-41d4-a716-446655440004",
-                "title": "General Volunteer",
-                "description": "Help with various tasks as needed",
-                "requiredSkills": [],  # No specific skills required
-                "timeSlots": ["weekend-morning", "weekend-afternoon"],
-                "location": {"latitude": 30.0444, "longitude": 31.2357},  # Exact Cairo center
-                "category": "general"
-            }
-        ]
-        
-        # Apply filters if provided
-        if filters:
-            if "category" in filters:
-                opportunities = [opp for opp in opportunities if opp["category"] == filters["category"]]
-            if "skills" in filters:
-                skill_filter = set(filters["skills"])
-                opportunities = [
-                    opp for opp in opportunities 
-                    if not opp["requiredSkills"] or skill_filter & set(opp["requiredSkills"])
-                ]
-        
-        return opportunities
     
     # Event publishing helper methods
     async def _publish_match_suggestions_generated(self, volunteer_id: str, suggestions: List[MatchSuggestion]):

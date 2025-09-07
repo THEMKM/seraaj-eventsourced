@@ -73,7 +73,7 @@ def resolve_schema_ref(schema_ref: str) -> Dict[str, Any]:
 
 
 def validate_response_schema(endpoint_path: str, method: str, status_code: int, response_data: Any):
-    """Validate response against OpenAPI schema - simplified version"""
+    """Validate response against OpenAPI schema with basic $ref resolution"""
     try:
         if not OPENAPI_SPEC:
             print("[DEBUG] No OpenAPI spec loaded, skipping validation")
@@ -97,21 +97,24 @@ def validate_response_schema(endpoint_path: str, method: str, status_code: int, 
             return
         
         print(f"[DEBUG] Found schema: {json.dumps(schema, indent=2)}")
-        
-        # Resolve schema references
-        if '$ref' in schema:
-            resolved_schema = resolve_schema_ref(schema['$ref'])
-            if resolved_schema:
-                schema = resolved_schema
-                print(f"[DEBUG] Resolved schema: {json.dumps(schema, indent=2)[:200]}...")
+
+        # Deeply resolve $ref fields for both components and external schemas
+        def _deep_resolve(obj: Any) -> Any:
+            if isinstance(obj, dict):
+                if '$ref' in obj:
+                    target = resolve_schema_ref(obj['$ref'])
+                    if target:
+                        return _deep_resolve(target)
+                return {k: _deep_resolve(v) for k, v in obj.items()}
+            if isinstance(obj, list):
+                return [_deep_resolve(x) for x in obj]
+            return obj
+
+        schema = _deep_resolve(schema)
         
         # Handle array responses
         if schema.get('type') == 'array' and 'items' in schema:
-            items_schema = schema['items']
-            if '$ref' in items_schema:
-                resolved_items = resolve_schema_ref(items_schema['$ref'])
-                if resolved_items:
-                    items_schema = resolved_items
+            items_schema = _deep_resolve(schema['items'])
             
             # Validate each item in the array
             if isinstance(response_data, list):
@@ -196,43 +199,23 @@ class ResetPasswordRequest(BaseModel):
     newPassword: str = Field(..., min_length=8, max_length=128, description="New password (minimum 8 characters)")
 
 
-# Mock data generators for contract-accurate responses
-def generate_mock_match_suggestion(volunteer_id: str, index: int = 0) -> Dict[str, Any]:
-    """Generate a mock match suggestion that matches the contract schema"""
-    opportunities = [
-        {
-            "title": "Community Education Program",
-            "description": "Help teach basic literacy skills to adults in the community center. Work with diverse groups of learners in a supportive environment.",
-            "requiredSkills": ["teaching", "communication", "patience"],
-            "location": "Downtown Community Center, 123 Main St",
-            "timeCommitment": "4 hours per week, evenings"
-        },
-        {
-            "title": "Environmental Cleanup Initiative",
-            "description": "Join our monthly park cleanup and tree planting activities. Help preserve local green spaces for future generations.",
-            "requiredSkills": ["physical", "environmental", "teamwork"],
-            "location": "Central Park, North Entrance",
-            "timeCommitment": "6 hours per month, weekends"
-        },
-        {
-            "title": "Senior Care Support",
-            "description": "Provide companionship and assistance to elderly residents. Activities include reading, games, and light assistance.",
-            "requiredSkills": ["social", "caregiving", "empathy"],
-            "location": "Sunset Senior Home, 456 Oak Ave",
-            "timeCommitment": "3 hours per week, flexible"
-        }
-    ]
-    opp = opportunities[index % len(opportunities)]
-    return {
-        "id": f"550e8400-e29b-41d4-a716-{446655440000 + index:012d}",  # Valid UUID format
-        "title": opp["title"],
-        "description": opp["description"],
-        "organizationName": f"Hope Foundation {index + 1}",
-        "requiredSkills": opp["requiredSkills"],
-        "location": opp["location"],
-        "timeCommitment": opp["timeCommitment"],
-        "matchScore": min(95, 85.5 + (index * 2))
-    }
+class UpdateProfileRequest(BaseModel):
+    name: Optional[str] = Field(None, description="User's display name")
+    email: Optional[str] = Field(None, description="User's email address")
+    phone: Optional[str] = Field(None, description="User's phone")
+    location: Optional[str] = Field(None, description="User's location")
+    skills: Optional[List[str]] = Field(None, description="User's skills")
+    interests: Optional[List[str]] = Field(None, description="User interests")
+    availability: Optional[Dict[str, Optional[bool]]] = Field(None, description="Time availability flags")
+    profileImageUrl: Optional[str] = Field(None, description="Profile image URL")
+
+
+class ReviewApplicationRequest(BaseModel):
+    decision: str = Field(..., description="Review decision: accept or reject")
+    reviewerNotes: Optional[str] = Field(None, max_length=2000, description="Optional reviewer notes")
+    reviewerId: Optional[str] = Field(None, description="ID of the reviewer")
+
+
 
 def _to_contract_match_suggestion(raw: Dict[str, Any], index: int = 0) -> Dict[str, Any]:
     """Map internal/legacy match suggestion to contract-compliant shape"""
@@ -295,45 +278,52 @@ def _to_contract_application(raw: Dict[str, Any]) -> Dict[str, Any]:
         "reviewerNotes": None,
     }
 
-def generate_mock_application(volunteer_id: str, index: int = 0) -> Dict[str, Any]:
-    """Generate a mock application that matches the contract schema"""
-    base_time = datetime.now(UTC)
-    return {
-        "id": f"550e8400-e29b-41d4-a716-{556677880000 + index:012d}",
-        "volunteerId": volunteer_id,
-        "opportunityId": f"660e8400-e29b-41d4-a716-{112233440000 + index:012d}",
-        "status": "pending",
-        "message": "I am very interested in this opportunity because...",
-        "appliedAt": base_time.isoformat(),
-        "reviewedAt": None,
-        "reviewerNotes": None,
-    }
 
 
-def generate_mock_volunteer_profile(volunteer_id: str) -> Dict[str, Any]:
-    """Generate a mock volunteer profile that matches the schema"""
-    base_time = datetime.now(UTC)
+async def get_clean_volunteer_profile(volunteer_id: str, auth_header: str | None = None) -> Dict[str, Any]:
+    """Fetch the persisted volunteer profile from Auth service; fallback to minimal profile."""
+    if auth_header:
+        try:
+            profile = await auth_adapter.get_profile(auth_header)
+            if profile:
+                return profile
+        except Exception as e:
+            logger.warning(f"Failed to fetch profile from auth: {e}")
+            try:
+                token = auth_header.replace("Bearer ", "") if auth_header else ""
+                user_data = await auth_adapter.get_current_user(token)
+                if user_data:
+                    return {
+                        "id": volunteer_id,
+                        "userId": volunteer_id,
+                        "name": user_data.get("name", ""),
+                        "email": user_data.get("email", ""),
+                        "phone": None,
+                        "location": None,
+                        "skills": [],
+                        "interests": [],
+                        "availability": None,
+                        "profileImageUrl": None,
+                        "createdAt": user_data.get("createdAt", datetime.now(UTC).isoformat()),
+                        "updatedAt": None,
+                    }
+            except Exception as e2:
+                logger.warning(f"Failed to build fallback profile from user: {e2}")
+
+    now = datetime.now(UTC).isoformat()
     return {
         "id": volunteer_id,
-        "email": "volunteer@example.com",
-        "firstName": "John",
-        "lastName": "Doe",
-        "level": 5,
-        "status": "active",
-        "skills": ["teaching", "technical", "social"],
-        "badges": [
-            {
-                "id": "badge-rookie",
-                "name": "Rookie",
-                "description": "Completed first volunteer opportunity",
-                "imageUrl": "https://example.com/badges/rookie.png",
-                "earnedAt": base_time.isoformat()
-            }
-        ],
-        "totalHours": 120.5,
-        "completedApplications": 8,
-        "createdAt": base_time.isoformat(),
-        "lastActive": base_time.isoformat()
+        "userId": volunteer_id,
+        "name": "",
+        "email": "",
+        "phone": None,
+        "location": None,
+        "skills": [],
+        "interests": [],
+        "availability": None,
+        "profileImageUrl": None,
+        "createdAt": now,
+        "updatedAt": None,
     }
 
 
@@ -357,6 +347,17 @@ async def health_check():
         }
     
     return response_data
+
+
+@app.get("/api/health/live")
+async def health_live():
+    """Fast liveness probe – does not check dependencies."""
+    return {
+        "status": "healthy",
+        "service": "bff",
+        "version": "1.1.0",
+        "timestamp": datetime.now(UTC).isoformat()
+    }
 
 
 @app.get("/api/health/services")
@@ -644,30 +645,47 @@ service_registry.register_default_services()
 # Initialize service adapters with service registry
 applications_adapter = ApplicationsAdapter(service_registry)
 matching_adapter = MatchingAdapter(service_registry)
-auth_adapter = AuthAdapter()
+auth_adapter = AuthAdapter(service_registry)
 
 # Initialize health checker with service dependencies
 health_checker = create_service_health_checker("bff")
 
-# Add service dependencies to health checker
+# Add service dependencies to health checker using service registry
+async def check_service_health(service_name: str):
+    """Check service health using service registry"""
+    try:
+        if service_name == "applications":
+            return await applications_adapter.health_check()
+        elif service_name == "matching":
+            return await matching_adapter.health_check()
+        elif service_name == "auth":
+            return await auth_adapter.health_check()
+        else:
+            # Fallback to direct URL check
+            service_url = await service_registry.get_service_url(service_name)
+            return await check_http_endpoint(f"{service_url}/health")
+    except Exception as e:
+        logger.warning(f"Health check failed for {service_name}: {e}")
+        return False
+
 health_checker.add_dependency(
     "applications_service",
-    lambda: check_http_endpoint("http://localhost:8001/health"),
-    timeout_seconds=3.0,
+    lambda: check_service_health("applications"),
+    timeout_seconds=5.0,
     critical=False  # Degraded but not unhealthy if down
 )
 
 health_checker.add_dependency(
     "matching_service", 
-    lambda: check_http_endpoint("http://localhost:8003/health"),
-    timeout_seconds=3.0,
+    lambda: check_service_health("matching"),
+    timeout_seconds=5.0,
     critical=False
 )
 
 health_checker.add_dependency(
     "auth_service",
-    lambda: check_http_endpoint("http://localhost:8004/health"),
-    timeout_seconds=3.0,
+    lambda: check_service_health("auth"),
+    timeout_seconds=5.0,
     critical=True  # Auth is critical for BFF functionality
 )
 
@@ -755,13 +773,14 @@ async def get_quick_match(request: QuickMatchRequest, req: Request):
             upstreamService="matching",
             error=str(e)
         )
-        # Fallback to mock data for graceful degradation
-        matches = [
-            generate_mock_match_suggestion(request.volunteerId, i)
-            for i in range(min(request.limit, 3))
-        ]
-        validate_response_schema("/volunteer/quick-match", "post", 200, matches)
-        return matches
+        # No fallback - service failure should be reported to user
+        err = StandardErrorResponse(
+            error="service_error", 
+            message="Matching service temporarily unavailable", 
+            code=503,
+            details={"reason": str(e)}
+        )
+        raise HTTPException(status_code=503, detail=err.model_dump())
     except Exception as e:
         log_structured(
             logger, "ERROR", "BFF quick match failed - unexpected error",
@@ -770,13 +789,14 @@ async def get_quick_match(request: QuickMatchRequest, req: Request):
             error=str(e),
             errorType=type(e).__name__
         )
-        # Fallback to mock data for graceful degradation
-        matches = [
-            generate_mock_match_suggestion(request.volunteerId, i)
-            for i in range(min(request.limit, 3))
-        ]
-        validate_response_schema("/volunteer/quick-match", "post", 200, matches)
-        return matches
+        # No fallback - service failure should be reported to user
+        err = StandardErrorResponse(
+            error="service_error", 
+            message="Matching service temporarily unavailable", 
+            code=503,
+            details={"reason": str(e)}
+        )
+        raise HTTPException(status_code=503, detail=err.model_dump())
 
 
 @app.post("/api/volunteer/apply", status_code=201)
@@ -883,16 +903,8 @@ async def get_volunteer_dashboard(volunteer_id: str, req: Request):
         recent_matches_raw = await matching_adapter.get_suggestions(volunteer_id, authorization=auth_header)
         recent_matches = [_to_contract_match_suggestion(m, i) for i, m in enumerate(recent_matches_raw)]
         
-        # Generate profile data (mock for now - would come from volunteer service in production)
-        profile = generate_mock_volunteer_profile(volunteer_id)
-        
-        # Update profile stats based on real data
-        profile.update({
-            "completedApplications": len([
-                app for app in applications 
-                if app.get('status') == 'completed'
-            ])
-        })
+        # Get clean profile data using real user information
+        profile = await get_clean_volunteer_profile(volunteer_id, auth_header)
         
         dashboard_data = {
             "profile": profile,
@@ -942,22 +954,326 @@ async def get_volunteer_dashboard(volunteer_id: str, req: Request):
             error=str(e),
             errorType=type(e).__name__
         )
-        # Fallback to mock data for graceful degradation
-        dashboard_data = {
-            "profile": generate_mock_volunteer_profile(volunteer_id),
-            "activeApplications": [
-                generate_mock_application(volunteer_id, i)
-                for i in range(2)
-            ],
-            "recentMatches": [
-                generate_mock_match_suggestion(volunteer_id, i)
-                for i in range(3)
-            ]
+        # Return error instead of mock data - real service failure should be reported
+        err = StandardErrorResponse(
+            error="service_error", 
+            message="Dashboard service temporarily unavailable", 
+            code=503,
+            details={"reason": str(e)}
+        )
+        raise HTTPException(status_code=503, detail=err.model_dump())
+
+
+@app.put("/api/volunteer/{volunteer_id}/profile")
+async def update_volunteer_profile(volunteer_id: str, request: UpdateProfileRequest, req: Request):
+    """Update volunteer profile information by delegating to Auth service profile API."""
+    try:
+        auth_header = req.headers.get("Authorization", "")
+        logger.info(f"Updating profile for volunteer_id: {volunteer_id}")
+
+        payload: Dict[str, Any] = {}
+        for key in ["name", "email", "phone", "location", "skills", "interests", "availability", "profileImageUrl"]:
+            value = getattr(request, key, None)
+            if value is not None:
+                payload[key] = value
+
+        saved = await auth_adapter.update_profile(auth_header, payload)
+        return {
+            "id": volunteer_id,
+            "profile": saved,
+            "message": "Profile updated successfully",
+            "updatedAt": saved.get("updatedAt")
         }
-        validate_response_schema("/volunteer/{volunteerId}/dashboard", "get", 200, dashboard_data)
-        return dashboard_data
+    except Exception as e:
+        logger.error(f"Failed to update profile for volunteer_id: {volunteer_id}, error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update profile: {str(e)}")
+
+
+# Organization endpoints for application management
+@app.get("/api/organization/{org_id}/applications")
+async def get_organization_applications(org_id: str, req: Request):
+    """Get applications for organization's opportunities"""
+    trace_id = get_trace_id(req)
+    auth_header = req.headers.get('Authorization')
+    
+    log_structured(
+        logger, "INFO", "BFF organization applications request",
+        trace_id=trace_id,
+        operation="get_organization_applications",
+        organizationId=org_id
+    )
+    
+    try:
+        # Call applications service via adapter for better error handling
+        # Note: This is a placeholder - the applications service needs to implement this endpoint
+        # For now, return empty list as organization applications are not yet implemented
+        log_structured(
+            logger, "INFO", "BFF organization applications response (placeholder)",
+            trace_id=trace_id,
+            operation="get_organization_applications",
+            organizationId=org_id,
+            applicationCount=0
+        )
+        return []
+                
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_structured(
+            logger, "ERROR", "BFF organization applications failed",
+            trace_id=trace_id,
+            operation="get_organization_applications",
+            organizationId=org_id,
+            error=str(e)
+        )
+        err = StandardErrorResponse(error="service_error", message="Service temporarily unavailable", code=503)
+        raise HTTPException(status_code=503, detail=err.model_dump())
+
+
+@app.post("/api/applications/{application_id}/review", status_code=200)
+async def review_application(application_id: str, request: ReviewApplicationRequest, req: Request):
+    """Review an application (organization endpoint)"""
+    trace_id = get_trace_id(req)
+    auth_header = req.headers.get('Authorization')
+    
+    log_structured(
+        logger, "INFO", "BFF application review request",
+        trace_id=trace_id,
+        operation="review_application",
+        applicationId=application_id,
+        decision=request.decision
+    )
+    
+    try:
+        # Call applications service to process the review via direct HTTP for now
+        # TODO: Move this to applications adapter when review endpoint is implemented there
+        try:
+            applications_url = await service_registry.get_service_url("applications")
+        except Exception:
+            applications_url = "http://localhost:8001"
+            
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{applications_url}/api/applications/{application_id}/review",
+                json={
+                    "decision": request.decision,
+                    "reviewerNotes": request.reviewerNotes,
+                    "reviewerId": request.reviewerId
+                },
+                headers=({"Authorization": auth_header} if auth_header else None)
+            )
+            
+            if response.status_code == 200:
+                application = response.json()
+                
+                log_structured(
+                    logger, "INFO", "BFF application review response",
+                    trace_id=trace_id,
+                    operation="review_application",
+                    applicationId=application_id,
+                    decision=request.decision,
+                    newStatus=application.get('status')
+                )
+                
+                # Log business metric
+                log_business_metric(
+                    logger, f"bff_application_reviewed_{request.decision}", 1,
+                    trace_id=trace_id,
+                    applicationId=application_id
+                )
+                
+                return application
+            else:
+                err = StandardErrorResponse(
+                    error="upstream_error", 
+                    message="Applications service error", 
+                    code=response.status_code,
+                    details={"body": response.text}
+                )
+                raise HTTPException(status_code=response.status_code, detail=err.model_dump())
+                
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_structured(
+            logger, "ERROR", "BFF application review failed",
+            trace_id=trace_id,
+            operation="review_application",
+            applicationId=application_id,
+            error=str(e)
+        )
+        err = StandardErrorResponse(error="service_error", message="Service temporarily unavailable", code=503)
+        raise HTTPException(status_code=503, detail=err.model_dump())
+
+
+@app.get("/api/organization/{org_id}/dashboard")
+async def get_organization_dashboard(org_id: str, req: Request):
+    """Get organization dashboard data"""
+    trace_id = get_trace_id(req)
+    auth_header = req.headers.get('Authorization')
+    
+    log_structured(
+        logger, "INFO", "BFF organization dashboard request",
+        trace_id=trace_id,
+        operation="get_organization_dashboard",
+        organizationId=org_id
+    )
+    
+    try:
+        # Get organization application stats via service registry
+        try:
+            applications_url = await service_registry.get_service_url("applications")
+        except Exception:
+            applications_url = "http://localhost:8001"
+            
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(
+                f"{applications_url}/api/applications/stats/organization/{org_id}",
+                headers=({"Authorization": auth_header} if auth_header else None)
+            )
+            
+            if response.status_code == 200:
+                stats = response.json()
+                
+                dashboard_data = {
+                    "organizationId": org_id,
+                    "applicationStats": stats,
+                    "recentActivity": []  # Could be enhanced with recent application activity
+                }
+                
+                log_structured(
+                    logger, "INFO", "BFF organization dashboard response",
+                    trace_id=trace_id,
+                    operation="get_organization_dashboard",
+                    organizationId=org_id
+                )
+                
+                return dashboard_data
+            else:
+                err = StandardErrorResponse(
+                    error="upstream_error", 
+                    message="Applications service error", 
+                    code=response.status_code
+                )
+                raise HTTPException(status_code=response.status_code, detail=err.model_dump())
+                
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_structured(
+            logger, "ERROR", "BFF organization dashboard failed",
+            trace_id=trace_id,
+            operation="get_organization_dashboard",
+            organizationId=org_id,
+            error=str(e)
+        )
+        err = StandardErrorResponse(error="service_error", message="Service temporarily unavailable", code=503)
+        raise HTTPException(status_code=503, detail=err.model_dump())
+
+
+# Opportunities endpoints
+@app.get("/api/opportunity/{opportunity_id}")
+async def get_opportunity_details(opportunity_id: str, req: Request):
+    """Get opportunity details from opportunities service"""
+    trace_id = get_trace_id(req)
+    
+    log_structured(
+        logger, "INFO", "BFF opportunity details requested",
+        trace_id=trace_id,
+        operation="get_opportunity_details",
+        opportunityId=opportunity_id
+    )
+    
+    try:
+        # Call opportunities service directly
+        opportunities_url = os.getenv('OPPORTUNITIES_SERVICE_URL', 'http://localhost:8003')
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{opportunities_url}/api/opportunities/{opportunity_id}",
+                timeout=10.0
+            )
+            
+            if response.status_code == 404:
+                raise HTTPException(status_code=404, detail="Opportunity not found")
+            elif response.status_code != 200:
+                raise HTTPException(status_code=response.status_code, detail="Failed to fetch opportunity details")
+            
+            opportunity_data = response.json()
+            
+            log_structured(
+                logger, "INFO", "BFF opportunity details retrieved",
+                trace_id=trace_id,
+                opportunityId=opportunity_id,
+                organizationId=opportunity_data.get('organization_id')
+            )
+            
+            return opportunity_data
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_structured(
+            logger, "ERROR", "BFF opportunity details failed",
+            trace_id=trace_id,
+            operation="get_opportunity_details",
+            opportunityId=opportunity_id,
+            error=str(e)
+        )
+        err = StandardErrorResponse(error="service_error", message="Service temporarily unavailable", code=503)
+        raise HTTPException(status_code=503, detail=err.model_dump())
+
+
+@app.get("/api/opportunities/organization/{org_id}")
+async def get_organization_opportunities(org_id: str, req: Request):
+    """Get opportunities for a specific organization"""
+    trace_id = get_trace_id(req)
+    
+    log_structured(
+        logger, "INFO", "BFF organization opportunities requested",
+        trace_id=trace_id,
+        operation="get_organization_opportunities",
+        organizationId=org_id
+    )
+    
+    try:
+        # Call opportunities service directly
+        opportunities_url = os.getenv('OPPORTUNITIES_SERVICE_URL', 'http://localhost:8003')
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{opportunities_url}/api/opportunities/organization/{org_id}",
+                timeout=10.0
+            )
+            
+            if response.status_code == 404:
+                return []  # Organization has no opportunities
+            elif response.status_code != 200:
+                raise HTTPException(status_code=response.status_code, detail="Failed to fetch organization opportunities")
+            
+            opportunities_data = response.json()
+            
+            log_structured(
+                logger, "INFO", "BFF organization opportunities retrieved",
+                trace_id=trace_id,
+                organizationId=org_id,
+                opportunitiesCount=len(opportunities_data)
+            )
+            
+            return opportunities_data
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_structured(
+            logger, "ERROR", "BFF organization opportunities failed",
+            trace_id=trace_id,
+            operation="get_organization_opportunities",
+            organizationId=org_id,
+            error=str(e)
+        )
+        err = StandardErrorResponse(error="service_error", message="Service temporarily unavailable", code=503)
+        raise HTTPException(status_code=503, detail=err.model_dump())
 
 
 if __name__ == "__main__":
     port = int(os.getenv('BFF_PORT', '8000'))
-    uvicorn.run(app, host="127.0.0.1", port=port, log_level="debug")
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="debug")
