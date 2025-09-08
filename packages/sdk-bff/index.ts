@@ -1,9 +1,348 @@
-/**
- * @seraaj/sdk-bff - TypeScript SDK for Seraaj BFF API
- * Auto-generated from OpenAPI specification
- */
+// Generated BFF SDK with comprehensive API clients
 
-export * from './src/runtime';
-export * from './src/types';
-export * from './src/apis';
-export { makeBffConfig } from './src/client';
+// Core types and enums
+export enum UserRole {
+  VOLUNTEER = 'VOLUNTEER',
+  ORG_ADMIN = 'ORG_ADMIN',
+  SUPERADMIN = 'SUPERADMIN'
+}
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  firstName?: string;
+  lastName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+}
+
+export interface LoginResponse {
+  user: User;
+  tokens: AuthTokens;
+}
+
+export interface ApplicationStats {
+  totalApplications: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  withdrawn: number;
+  active: number;
+}
+
+export interface VolunteerDashboardResponse {
+  profile: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    points?: number;
+    level: number;
+    status: string;
+    skills: string[];
+    badges: Array<{
+      id: string;
+      name: string;
+      description: string;
+      imageUrl: string;
+      earnedAt: string;
+    }>;
+    totalHours: number;
+    completedApplications: number;
+    createdAt: string;
+    lastActive: string;
+    location?: string;
+  };
+  activeApplications: Array<{
+    id: string;
+    volunteerId: string;
+    opportunityId: string;
+    organizationId: string | null;
+    status: string;
+    coverLetter: string;
+    submittedAt: string;
+    reviewedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  recentMatches: Array<{
+    id: string;
+    volunteerId: string;
+    opportunityId: string;
+    organizationId: string;
+    score: number;
+    scoreComponents: {
+      distance: number;
+      skills: number;
+      availability: number;
+    };
+    explanation: string[];
+    generatedAt: string;
+    status: string;
+  }>;
+  applicationStats?: ApplicationStats;
+}
+
+export interface ApiResponse<T = any> {
+    data: T;
+    success: boolean;
+    message?: string;
+}
+
+export interface Configuration {
+  basePath: string;
+  accessToken?: string | (() => string | undefined);
+}
+
+// Base HTTP client
+export class BaseClient {
+  protected config: Configuration;
+  
+  constructor(config: Configuration) {
+    this.config = config;
+  }
+  
+  protected async request<T>(
+    method: string,
+    path: string,
+    data?: any,
+    headers: Record<string, string> = {}
+  ): Promise<T> {
+    const url = `${this.config.basePath}${path}`;
+    
+    const requestHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...headers
+    };
+    
+    // Add authorization header if token available
+    const token = typeof this.config.accessToken === 'function' 
+      ? this.config.accessToken() 
+      : this.config.accessToken;
+    
+    if (token) {
+      requestHeaders['Authorization'] = `Bearer ${token}`;
+    }
+    
+    const response = await fetch(url, {
+      method,
+      headers: requestHeaders,
+      body: data ? JSON.stringify(data) : undefined
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: response.statusText }));
+      
+      // Create enhanced error with full context
+      const error = new Error(errorData.message || errorData.detail || `HTTP ${response.status}`);
+      // Attach extra context for richer error handling in callers
+      const errAny: any = error;
+      errAny.status = response.status;
+      errAny.statusText = response.statusText;
+      errAny.data = errorData;
+      
+      // Handle detailed validation errors
+      if (Array.isArray(errorData.detail)) {
+        const fieldErrors = errorData.detail.map((detail: any) => {
+          const field = detail.loc?.[1] || 'field';
+          const msg = detail.msg || 'Invalid value';
+          return `${field}: ${msg}`;
+        });
+        error.message = `Validation failed: ${fieldErrors.join(', ')}`;
+      }
+      
+      throw error;
+    }
+    
+    return response.json();
+  }
+}
+
+// Auth API client
+export class AuthApi extends BaseClient {
+  async registerUser(userData: {
+    name: string;
+    email: string;
+    password: string;
+    role: UserRole;
+  }): Promise<LoginResponse> {
+    return this.request<LoginResponse>('POST', '/auth/register', userData);
+  }
+  
+  async loginUser(credentials: {
+    email: string;
+    password: string;
+  }): Promise<LoginResponse> {
+    return this.request<LoginResponse>('POST', '/auth/login', credentials);
+  }
+  
+  async refreshTokens(data: {
+    refreshToken: string;
+  }): Promise<AuthTokens> {
+    return this.request<AuthTokens>('POST', '/auth/refresh', data);
+  }
+  
+  async getCurrentUser(): Promise<User> {
+    return this.request<User>('GET', '/auth/me');
+  }
+
+  // Temporary insecure reset; returns { status: 'ok' }
+  // TODO(security): Replace with token-based reset flow
+  async resetPassword(data: { email: string; newPassword: string; }): Promise<{ status: string; userId?: string }> {
+    return this.request<{ status: string; userId?: string }>('POST', '/auth/reset-password', data);
+  }
+}
+
+// Volunteer API client
+export class VolunteerApi extends BaseClient {
+  async getQuickMatch(data: {
+    volunteerId: string;
+    limit?: number;
+  }): Promise<any[]> {
+    return this.request<any[]>('POST', '/volunteer/quick-match', data);
+  }
+
+  async getOpportunityDetails(opportunityId: string): Promise<{
+    id: string;
+    title: string;
+    description: string;
+    organization_id: string;
+    location: string;
+    is_remote: boolean;
+    skills_required: string[];
+    time_commitment: string | null;
+    start_date: string;
+    end_date: string | null;
+    max_volunteers: number;
+    current_volunteers: number;
+    contact_email: string;
+    requirements: string | null;
+    benefits: string | null;
+    status: string;
+    created_at: string;
+    updated_at: string;
+  }> {
+    return this.request('GET', `/opportunity/${opportunityId}`);
+  }
+  
+  async submitApplication(data: {
+    volunteerId: string;
+    opportunityId: string;
+    coverLetter?: string;
+  }): Promise<any> {
+    return this.request<any>('POST', '/volunteer/apply', data);
+  }
+  
+  async completeApplication(applicationId: string, notes?: string): Promise<any> {
+    const body = notes ? { notes } : undefined;
+    return this.request<any>('POST', `/applications/${applicationId}/complete`, body);
+  }
+  
+  async getVolunteerDashboard(volunteerId: string): Promise<VolunteerDashboardResponse> {
+    return this.request<VolunteerDashboardResponse>('GET', `/volunteer/${volunteerId}/dashboard`);
+  }
+  
+  async getApplications(volunteerId: string): Promise<any[]> {
+    return this.request<any[]>('GET', `/volunteer/${volunteerId}/applications`);
+  }
+
+  async getVolunteerProfile(volunteerId: string): Promise<any> {
+    return this.request<any>('GET', `/volunteer/${volunteerId}/profile`);
+  }
+
+  async updateVolunteerProfile(
+    volunteerId: string,
+    data: {
+      name?: string;
+      email?: string;
+      phone?: string;
+      location?: string;
+      bio?: string;
+      skills?: string[];
+      interests?: string[];
+      availability?: { weekdays?: boolean; weekends?: boolean; evenings?: boolean };
+      profileImageUrl?: string;
+    }
+  ): Promise<{ id: string; profile: any; message: string; updatedAt?: string }> {
+    return this.request('PUT', `/volunteer/${volunteerId}/profile`, data);
+  }
+}
+
+// System API client
+export class SystemApi extends BaseClient {
+  async getHealth(): Promise<{
+    status: string;
+    timestamp: string;
+    version: string;
+  }> {
+    return this.request('GET', '/health');
+  }
+}
+
+// BFF Client (unified client)
+export class BFFClient extends BaseClient {
+  public auth: AuthApi;
+  public volunteer: VolunteerApi;
+  public system: SystemApi;
+  
+  constructor(config: Configuration) {
+    super(config);
+    this.auth = new AuthApi(config);
+    this.volunteer = new VolunteerApi(config);
+    this.system = new SystemApi(config);
+  }
+  
+  // Legacy methods for backward compatibility
+  async get<T>(path: string): Promise<ApiResponse<T>> {
+    try {
+      const data = await this.request<T>('GET', path);
+      return { data, success: true };
+    } catch (error) {
+      return { data: null as T, success: false, message: (error as Error).message };
+    }
+  }
+  
+  async post<T>(path: string, data?: any): Promise<ApiResponse<T>> {
+    try {
+      const result = await this.request<T>('POST', path, data);
+      return { data: result, success: true };
+    } catch (error) {
+      return { data: null as T, success: false, message: (error as Error).message };
+    }
+  }
+}
+
+// Factory functions
+export function createAuthApi(config: Configuration): AuthApi {
+  return new AuthApi(config);
+}
+
+export function createVolunteerApi(config: Configuration): VolunteerApi {
+  return new VolunteerApi(config);
+}
+
+export function createSystemApi(config: Configuration): SystemApi {
+  return new SystemApi(config);
+}
+
+export function createBffClient(config: Configuration): BFFClient {
+  return new BFFClient(config);
+}
+
+export function createAuthenticatedVolunteerApi(accessToken: string): VolunteerApi {
+  return new VolunteerApi({
+    basePath: process.env.NEXT_PUBLIC_BFF_URL || 'http://localhost:8000/api',
+    accessToken
+  });
+}
+
+// Default instances
+export const bffClient = new BFFClient({ basePath: '/api' });

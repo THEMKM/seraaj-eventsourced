@@ -1,6 +1,7 @@
 import pytest
 from datetime import datetime
 from services.matching.service import MatchingService
+from services.shared.models import MatchSuggestionStatus
 
 @pytest.mark.asyncio
 async def test_quick_match():
@@ -27,7 +28,7 @@ async def test_quick_match():
         assert suggestion.scoreComponents is not None
         assert suggestion.explanation is not None
         assert len(suggestion.explanation) > 0
-        assert suggestion.status == "pending"
+        assert suggestion.status == MatchSuggestionStatus.active
 
 @pytest.mark.asyncio
 async def test_quick_match_with_medical_volunteer():

@@ -1,0 +1,1 @@
+"""Opportunities service stub"""

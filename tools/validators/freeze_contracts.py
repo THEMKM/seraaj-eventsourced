@@ -6,7 +6,7 @@ from datetime import datetime
 
 def freeze_contracts():
     """Freeze contracts at current state"""
-    contracts_dir = Path("contracts/v1.0.0")
+    contracts_dir = Path("contracts/v1.1.0")
     lock_file = Path("contracts/version.lock")
     
     # Calculate checksum

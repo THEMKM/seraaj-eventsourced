@@ -1,0 +1,42 @@
+{
+  "volunteer_profile": {
+    "userType": "volunteer",
+    "name": "Ahmed Hassan",
+    "email": "ahmed@example.com",
+    "location": "Cairo, Egypt",
+    "bio": "Passionate about education and technology",
+    "skills": ["Teaching", "Web Development", "Mentoring"],
+    "interests": ["Direct Service", "Training & Workshops"],
+    "causes": ["Education", "Technology for Good"],
+    "availability": "3-5",
+    "onboardingCompleted": true,
+    "completedAt": "2025-01-09T20:30:00.000Z"
+  },
+  "organization_profile": {
+    "userType": "organization",
+    "name": "TechForGood Egypt",
+    "organizationName": "TechForGood Egypt",
+    "email": "contact@techforgood.eg",
+    "location": "Cairo, Egypt",
+    "bio": "Non-profit focused on digital literacy and education technology",
+    "organizationType": "nonprofit",
+    "organizationSize": "6-20",
+    "causes": ["Education", "Technology for Good"],
+    "onboardingCompleted": true,
+    "completedAt": "2025-01-09T20:30:00.000Z"
+  },
+  "test_matching": {
+    "high_match_opportunity": {
+      "title": "Digital Literacy Trainer",
+      "requiredSkills": ["Teaching", "Web Development"],
+      "location": "Cairo, Egypt",
+      "timeCommitment": "moderate",
+      "experienceRequired": "beginner",
+      "causes": ["Education", "Technology for Good"],
+      "activityTypes": ["Training & Workshops"],
+      "timeCommitmentHours": 4,
+      "remoteAllowed": false
+    },
+    "expected_match_score": "> 0.85"
+  }
+}

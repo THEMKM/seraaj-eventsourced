@@ -1,0 +1,1 @@
+"""Volunteers service stub"""

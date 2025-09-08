@@ -1,0 +1,82 @@
+{
+  "timestamp": "2025-01-15T10:30:00Z",
+  "phase": "OBSERVABILITY_BASELINE",
+  "structured_logging": true,
+  "services_instrumented": ["applications", "matching", "auth", "bff"],
+  "health_checks": true,
+  "trace_propagation": true,
+  "otel_optional": true,
+  "performance_acceptable": true,
+  "features": {
+    "json_logging": {
+      "implemented": true,
+      "middleware": true,
+      "trace_ids": true,
+      "correlation": true
+    },
+    "health_endpoints": {
+      "basic": "/health",
+      "liveness": "/health/live",
+      "readiness": "/health/ready",
+      "aggregated": "/api/health/services"
+    },
+    "observability": {
+      "request_logging": true,
+      "error_logging": true,
+      "business_metrics": true,
+      "performance_metrics": true,
+      "opentelemetry_optional": true
+    },
+    "testing": {
+      "unit_tests": true,
+      "log_format_validation": true,
+      "middleware_testing": true
+    }
+  },
+  "services": {
+    "applications": {
+      "port": 8001,
+      "structured_logging": true,
+      "health_checks": true,
+      "trace_correlation": true
+    },
+    "matching": {
+      "port": 8002,
+      "structured_logging": true,
+      "health_checks": true,
+      "trace_correlation": true
+    },
+    "auth": {
+      "port": 8004,
+      "structured_logging": true,
+      "health_checks": true,
+      "trace_correlation": true
+    },
+    "bff": {
+      "port": 8000,
+      "structured_logging": true,
+      "health_aggregation": true,
+      "trace_correlation": true
+    }
+  },
+  "log_format": {
+    "format": "json",
+    "fields": ["timestamp", "level", "traceId", "service", "operation", "message"],
+    "trace_propagation": "X-Trace-Id header",
+    "levels": ["INFO", "WARN", "ERROR"]
+  },
+  "environment_variables": {
+    "LOG_LEVEL": "INFO|DEBUG|WARN|ERROR",
+    "LOG_FORMAT": "json|text",
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "optional for telemetry",
+    "OTEL_SERVICE_NAME": "service-specific name",
+    "OTEL_RESOURCE_ATTRIBUTES": "metadata for traces"
+  },
+  "next_steps": [
+    "Deploy services with structured logging",
+    "Configure log aggregation (ELK, Grafana Loki)",
+    "Setup OpenTelemetry collector (optional)",
+    "Configure monitoring dashboards",
+    "Setup alerting on error rates"
+  ]
+}

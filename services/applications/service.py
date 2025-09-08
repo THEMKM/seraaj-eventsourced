@@ -5,18 +5,27 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import uuid4
 
-from services.shared.models import Application
+from services.shared.models import Application, ApplicationStatus
 from .repository import ApplicationRepository
 from .state_machine import ApplicationStateMachine, ApplicationState
 from .events import EventPublisher
 
 
 class SubmitApplicationCommand:
-    """Command for submitting an application"""
-    def __init__(self, volunteer_id: str, opportunity_id: str, cover_letter: Optional[str] = None):
-        self.volunteerId = volunteer_id
-        self.opportunityId = opportunity_id
-        self.coverLetter = cover_letter
+    """Command for submitting an application (supports camelCase and snake_case)"""
+    def __init__(
+        self,
+        volunteerId: Optional[str] = None,
+        opportunityId: Optional[str] = None,
+        coverLetter: Optional[str] = None,
+        # Backward-compatible snake_case parameters used in tests
+        volunteer_id: Optional[str] = None,
+        opportunity_id: Optional[str] = None,
+        cover_letter: Optional[str] = None,
+    ):
+        self.volunteerId = volunteerId or volunteer_id  # type: ignore[assignment]
+        self.opportunityId = opportunityId or opportunity_id  # type: ignore[assignment]
+        self.coverLetter = coverLetter if coverLetter is not None else cover_letter
 
 
 class ApplicationService:
@@ -41,7 +50,7 @@ class ApplicationService:
         existing_apps = await self.repository.find_by_volunteer(command.volunteerId)
         for app in existing_apps:
             if (app.opportunityId == command.opportunityId and 
-                app.status not in ['rejected', 'cancelled', 'completed']):
+                app.status not in [ApplicationStatus.rejected, ApplicationStatus.cancelled, ApplicationStatus.completed]):
                 raise ValueError(f"Application already exists for this opportunity")
         
         # Create application
@@ -98,6 +107,7 @@ class ApplicationService:
             )
         
         # Execute transition
+        old_state = state_machine.state
         state_machine.transition(action)
         
         # Update application
@@ -112,6 +122,18 @@ class ApplicationService:
         
         # Save changes
         application = await self.repository.update(application)
+
+        # Publish state changed event
+        try:
+            await self.event_publisher.publish_application_state_changed(
+                application_id=application.id,
+                old_state=old_state.value if hasattr(old_state, 'value') else str(old_state),
+                new_state=state_machine.state.value if hasattr(state_machine.state, 'value') else str(state_machine.state),
+                details={"action": action, "reason": reason} if reason else {"action": action}
+            )
+        except Exception:
+            # Non-fatal for business flow; log and continue
+            print(f"[WARN] Failed to publish state changed event for {application.id}")
         
         # Handle completed state
         if state_machine.state == ApplicationState.COMPLETED:
@@ -154,3 +176,7 @@ class ApplicationService:
     async def get_opportunity_applications(self, opportunity_id: str) -> List[Application]:
         """Get all applications for an opportunity"""
         return await self.repository.find_by_opportunity(opportunity_id)
+    
+    async def get_organization_stats(self, organization_id: str) -> dict:
+        """Get application statistics for an organization"""
+        return await self.repository.get_organization_stats(organization_id)

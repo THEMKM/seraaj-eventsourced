@@ -1,5 +1,9 @@
 # Seraaj - Event-Sourced Volunteer Management Platform
 
+[![CI Pipeline](https://github.com/THEMKM/seraaj-eventsourced/actions/workflows/ci.yml/badge.svg)](https://github.com/THEMKM/seraaj-eventsourced/actions/workflows/ci.yml)
+[![Code Quality](https://github.com/THEMKM/seraaj-eventsourced/actions/workflows/code-quality.yml/badge.svg)](https://github.com/THEMKM/seraaj-eventsourced/actions/workflows/code-quality.yml)
+[![Deploy](https://github.com/THEMKM/seraaj-eventsourced/actions/workflows/deploy.yml/badge.svg)](https://github.com/THEMKM/seraaj-eventsourced/actions/workflows/deploy.yml)
+
 ## Overview
 Seraaj is a complete volunteer management platform built with event-sourced architecture, sophisticated matching algorithms, and strict contract-first development. The system features a Next.js 14 frontend with 8-Bit Optimism design, TypeScript SDK generation, and runtime schema validation.
 
@@ -40,7 +44,7 @@ pnpm -w type-check && pnpm -w lint && pnpm -w build
 uvicorn services.applications.api:app --host 127.0.0.1 --port 8001
 
 # Terminal 2: Matching Service  
-uvicorn services.matching.api:app --host 127.0.0.1 --port 8002
+uvicorn services.matching.api:app --host 127.0.0.1 --port 8003
 
 # Terminal 3: BFF (Backend-for-Frontend)
 uvicorn bff.main:app --host 127.0.0.1 --port 8000
@@ -55,13 +59,13 @@ pnpm dev:web
 - **Frontend**: http://localhost:3000 (8-Bit Optimism design system)
 - **BFF API**: http://127.0.0.1:8000/api (OpenAPI docs at /docs)
 - **Applications**: http://127.0.0.1:8001 (Event-sourced application management)
-- **Matching**: http://127.0.0.1:8002 (ML-like scoring algorithm)
+- **Matching**: http://127.0.0.1:8003 (ML-like scoring algorithm)
 
 ## System Architecture
 
 ### Services Overview
 - **Applications Service** (Port 8001): Event-sourced application management with state machine lifecycle
-- **Matching Service** (Port 8002): Sophisticated scoring algorithm with distance/skills/availability weighting
+- **Matching Service** (Port 8003): Sophisticated scoring algorithm with distance/skills/availability weighting
 - **BFF Service** (Port 8000): Backend-for-Frontend with runtime schema validation and service orchestration
 - **Frontend** (Port 3000): Next.js 14 with 8-Bit Optimism design system and strict SDK-only HTTP boundaries
 
@@ -79,7 +83,7 @@ pnpm dev:web
 - `PATCH /applications/{id}/state` - Update application state
 - `GET /applications/volunteer/{volunteerId}` - Get volunteer's applications
 
-#### Matching API (http://127.0.0.1:8002)
+#### Matching API (http://127.0.0.1:8003)
 - `POST /quick-match` - Generate top 3 matches for volunteer
 - `POST /generate` - Generate comprehensive matches with filtering
 - `GET /suggestions/{volunteer_id}` - Get existing match suggestions
@@ -168,13 +172,13 @@ bash tools/validators/watch.sh
 ```bash
 # Start all services (4 terminals)
 uvicorn services.applications.api:app --host 127.0.0.1 --port 8001
-uvicorn services.matching.api:app --host 127.0.0.1 --port 8002  
+uvicorn services.matching.api:app --host 127.0.0.1 --port 8003  
 uvicorn bff.main:app --host 127.0.0.1 --port 8000
 pnpm dev:web
 
 # Check service health
 curl http://127.0.0.1:8001/health  # Applications
-curl http://127.0.0.1:8002/health  # Matching
+curl http://127.0.0.1:8003/health  # Matching
 curl http://127.0.0.1:8000/api/health  # BFF
 ```
 

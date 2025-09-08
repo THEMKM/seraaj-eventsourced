@@ -7,6 +7,19 @@
 
 :root {
   color-scheme: light dark;
+  
+  /* Design tokens from UI package */
+  --sun-burst: #FFD749;
+  --ink: #101028;
+  --pixel-coral: #FF6B94;
+  --neon-cyan: #00FFFF;
+  --electric-teal: #00CCAA;
+  --deep-indigo: #1A1B3A;
+  --pixel-lavender: #B794F6;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --error: #EF4444;
+  --info: #3B82F6;
 }
 
 html,
