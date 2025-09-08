@@ -100,7 +100,17 @@
       "Read(C:\\Users\\Mohamad\\Documents\\Claude\\Seraaj/**)",
       "Read(C:\\Users\\Mohamad\\Documents\\Claude\\Seraaj\\apps\\web\\components\\onboarding/**)",
       "Bash(dir services)",
-      "Bash(redis-cli:*)"
+      "Bash(redis-cli:*)",
+      "Bash(BFF_PORT=8080 python -m bff.main)",
+      "Bash(NEXT_PUBLIC_BFF_URL=http://localhost:8080/api pnpm dev)",
+      "Bash(dir \"C:\\Users\\Mohamad\\Documents\\Claude\\Seraaj\")",
+      "Bash(dir \"C:\\Users\\Mohamad\\Documents\\Claude\\Seraaj\\apps\")",
+      "Bash(dir \"C:\\Users\\Mohamad\\Documents\\Claude\\Seraaj\\frontend\")",
+      "Bash(dir \"C:\\Users\\Mohamad\\Documents\\Claude\\Seraaj\\apps\\web\")",
+      "Read(//c/Users/Mohamad/Documents/Claude/Seraaj/**)",
+      "Bash(dir \"C:\\Users\\Mohamad\\Documents\\Claude\\Seraaj\\apps\\web\\components\\onboarding\\steps\")",
+      "Bash(dir:*)",
+      "Bash(echo:*)"
     ],
     "deny": []
   }

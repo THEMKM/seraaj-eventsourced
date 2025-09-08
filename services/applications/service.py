@@ -107,6 +107,7 @@ class ApplicationService:
             )
         
         # Execute transition
+        old_state = state_machine.state
         state_machine.transition(action)
         
         # Update application
@@ -121,6 +122,18 @@ class ApplicationService:
         
         # Save changes
         application = await self.repository.update(application)
+
+        # Publish state changed event
+        try:
+            await self.event_publisher.publish_application_state_changed(
+                application_id=application.id,
+                old_state=old_state.value if hasattr(old_state, 'value') else str(old_state),
+                new_state=state_machine.state.value if hasattr(state_machine.state, 'value') else str(state_machine.state),
+                details={"action": action, "reason": reason} if reason else {"action": action}
+            )
+        except Exception:
+            # Non-fatal for business flow; log and continue
+            print(f"[WARN] Failed to publish state changed event for {application.id}")
         
         # Handle completed state
         if state_machine.state == ApplicationState.COMPLETED:

@@ -20,7 +20,13 @@ try:
     
     # Check if routes are registered
     routes = [route.path for route in app.routes]
-    expected_routes = ["/api/health", "/api/volunteer/quick-match", "/api/volunteer/apply", "/api/volunteer/{volunteer_id}/dashboard"]
+    expected_routes = [
+        "/api/health",
+        "/api/volunteer/quick-match",
+        "/api/volunteer/apply",
+        "/api/volunteer/{volunteer_id}/dashboard",
+        "/api/volunteer/{volunteer_id}/profile",
+    ]
     
     print("\nRegistered routes:")
     for route in routes:

@@ -31,6 +31,9 @@ class EventTypes:
     SERVICE_STOPPED = "service.stopped"
     SERVICE_HEALTH_CHECK = "service.health.check"
     SERVICE_ERROR = "service.error"
+
+    # Recognition/Points Events
+    POINTS_AWARD = "points.award"
     
     # Organization Events (future)
     ORGANIZATION_CREATED = "organization.created"
@@ -163,6 +166,17 @@ class EventSchemas:
         }
     }
 
+    POINTS_AWARD = {
+        "type": "object",
+        "required": ["volunteerId", "points"],
+        "properties": {
+            "volunteerId": {"type": "string"},
+            "points": {"type": "integer", "minimum": 1},
+            "reason": {"type": ["string", "null"]},
+            "applicationId": {"type": ["string", "null"]}
+        }
+    }
+
     USER_LOGIN = {
         "type": "object",
         "required": ["userId", "email", "loginAt"],
@@ -198,6 +212,7 @@ class EventSchemas:
         EventTypes.APPLICATION_SUBMITTED: APPLICATION_SUBMITTED,
         EventTypes.APPLICATION_STATE_CHANGED: APPLICATION_STATE_CHANGED,
         EventTypes.APPLICATION_COMPLETED: APPLICATION_COMPLETED,
+        EventTypes.POINTS_AWARD: POINTS_AWARD,
         EventTypes.MATCH_SUGGESTIONS_GENERATED: MATCH_SUGGESTIONS_GENERATED,
         EventTypes.MATCH_SUGGESTION_APPLIED: MATCH_SUGGESTION_APPLIED,
         EventTypes.USER_REGISTERED: USER_REGISTERED,

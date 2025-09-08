@@ -13,11 +13,15 @@ class MatchScore:
 class MatchingAlgorithm:
     """Core matching algorithm"""
     
-    # Scoring weights
+    # Scoring weights - V2 inspired 7-factor system
     WEIGHTS = {
-        "distance": 0.4,      # 40% - Physical proximity
-        "skills": 0.35,       # 35% - Skill match
-        "availability": 0.25, # 25% - Time availability
+        "skill_match": 0.25,           # 25% - Skill alignment
+        "location_match": 0.20,        # 20% - Location compatibility
+        "availability_match": 0.15,    # 15% - Time availability
+        "experience_match": 0.15,      # 15% - Experience level
+        "cause_match": 0.10,           # 10% - Cause alignment
+        "time_commitment_match": 0.10, # 10% - Hours per week match
+        "interest_match": 0.05,        # 5% - Activity type interests
     }
     
     def calculate_match_score(
@@ -30,59 +34,52 @@ class MatchingAlgorithm:
         components = {}
         explanations = []
         
-        # Distance score (inverse of distance)
-        distance_km = self._calculate_distance(
-            volunteer.get("location", {}),
-            opportunity.get("location", {})
+        # 1. Skill matching
+        components["skill_match"] = self._calculate_skill_match(
+            volunteer.get("skills", []), 
+            opportunity.get("requiredSkills", [])
         )
         
-        if distance_km <= 5:
-            components["distance"] = 1.0
-            explanations.append("Very close (< 5km)")
-        elif distance_km <= 15:
-            components["distance"] = 0.8
-            explanations.append("Nearby (< 15km)")
-        elif distance_km <= 30:
-            components["distance"] = 0.5
-            explanations.append("Moderate distance (< 30km)")
-        else:
-            components["distance"] = 0.2
-            explanations.append(f"Far ({distance_km:.1f}km)")
+        # 2. Location matching
+        components["location_match"] = self._calculate_location_match(
+            volunteer.get("location", ""),
+            opportunity.get("location", ""),
+            opportunity.get("remoteAllowed", False)
+        )
         
-        # Skills match
-        volunteer_skills = set(volunteer.get("skills", []))
-        required_skills = set(opportunity.get("requiredSkills", []))
+        # 3. Availability matching (time commitment)
+        # Prefer time slots overlap when available
+        components["availability_match"] = self._calculate_availability_match(
+            volunteer.get("availability", []),
+            opportunity.get("timeSlots", []) or opportunity.get("timeCommitment", "")
+        )
         
-        if required_skills:
-            skill_match = len(volunteer_skills & required_skills) / len(required_skills)
-            components["skills"] = skill_match
-            
-            if skill_match >= 1.0:
-                explanations.append("All skills matched")
-            elif skill_match >= 0.5:
-                explanations.append(f"{int(skill_match * 100)}% skills matched")
-            else:
-                explanations.append(f"Only {int(skill_match * 100)}% skills matched")
-        else:
-            components["skills"] = 1.0  # No specific skills required
-            explanations.append("No specific skills required")
+        # 4. Experience matching
+        components["experience_match"] = self._calculate_experience_match(
+            volunteer.get("experienceLevel", "beginner"),
+            opportunity.get("experienceRequired", "")
+        )
         
-        # Availability match
-        volunteer_avail = set(volunteer.get("availability", []))
-        opportunity_times = set(opportunity.get("timeSlots", []))
+        # 5. Cause alignment
+        components["cause_match"] = self._calculate_cause_match(
+            volunteer.get("causes", []),
+            opportunity.get("causes", [])
+        )
         
-        if opportunity_times and volunteer_avail:
-            avail_match = len(volunteer_avail & opportunity_times) / len(opportunity_times)
-            components["availability"] = avail_match
-            
-            if avail_match >= 0.8:
-                explanations.append("Excellent time match")
-            elif avail_match >= 0.5:
-                explanations.append("Good time match")
-            else:
-                explanations.append("Limited time overlap")
-        else:
-            components["availability"] = 0.5  # Neutral if not specified
+        # 6. Time commitment match (hours per week)
+        components["time_commitment_match"] = self._calculate_time_commitment_match(
+            volunteer.get("availability", ""),  # Maps to hours/week
+            opportunity.get("timeCommitmentHours", 0)
+        )
+        
+        # 7. Interest match (activity types)
+        components["interest_match"] = self._calculate_interest_match(
+            volunteer.get("interests", []),
+            opportunity.get("activityTypes", [])
+        )
+        
+        # Generate explanations
+        explanations = self._generate_explanations(volunteer, opportunity, components)
         
         # Calculate weighted total
         total_score = sum(
@@ -121,6 +118,217 @@ class MatchingAlgorithm:
         c = 2 * atan2(sqrt(a), sqrt(1-a))
         
         return R * c
+
+    def _calculate_skill_match(self, volunteer_skills: List[str], required_skills: List[str]) -> float:
+        """Calculate skill matching score"""
+        if not required_skills:
+            return 0.5  # Neutral if no skills required
+        
+        if not volunteer_skills:
+            return 0.0
+        
+        vol_skills = set(skill.lower().strip() for skill in volunteer_skills)
+        req_skills = set(skill.lower().strip() for skill in required_skills)
+        
+        matching_skills = vol_skills.intersection(req_skills)
+        match_ratio = len(matching_skills) / len(req_skills)
+        
+        # Bonus for additional relevant skills
+        additional_relevant = vol_skills - req_skills
+        bonus = min(len(additional_relevant) * 0.1, 0.3)
+        
+        return min(match_ratio + bonus, 1.0)
+
+    def _calculate_location_match(self, vol_location: Any, opp_location: Any, remote_allowed: bool) -> float:
+        """Calculate location matching score.
+
+        Accepts either string locations ("City, Country") or coordinate dicts
+        {"latitude": float, "longitude": float}. If remote is allowed, returns 1.0.
+        """
+        if remote_allowed:
+            return 1.0  # Perfect match if remote work is allowed
+
+        if not vol_location or not opp_location:
+            return 0.5  # Neutral if location not specified
+
+        # If both are coordinate dicts, compute distance-based score
+        if isinstance(vol_location, dict) and isinstance(opp_location, dict):
+            try:
+                dist_km = self._calculate_distance(vol_location, opp_location)
+                # Piecewise score decay with distance
+                if dist_km <= 5:
+                    return 1.0
+                if dist_km <= 20:
+                    return 0.85
+                if dist_km <= 50:
+                    return 0.7
+                if dist_km <= 100:
+                    return 0.5
+                if dist_km <= 250:
+                    return 0.3
+                return 0.15
+            except Exception:
+                return 0.5
+
+        # Fallback to string comparison if not dicts
+        try:
+            vol_parts = str(vol_location).lower().split(',')
+            opp_parts = str(opp_location).lower().split(',')
+
+            # Same city match
+            if len(vol_parts) >= 1 and len(opp_parts) >= 1:
+                if vol_parts[0].strip() == opp_parts[0].strip():
+                    return 1.0
+
+            # Same country match
+            if len(vol_parts) >= 2 and len(opp_parts) >= 2:
+                if vol_parts[1].strip() == opp_parts[1].strip():
+                    return 0.7
+        except Exception:
+            return 0.5
+
+        return 0.2  # Different regions
+
+    def _calculate_availability_match(self, volunteer_availability: Any, opportunity_commitment_or_slots: Any) -> float:
+        """Calculate availability matching score.
+
+        Supports either legacy string categories or list-based time slots.
+        If `opportunity_commitment_or_slots` is a list (timeSlots), compute
+        overlap with volunteer_availability list using Jaccard similarity.
+        """
+        # If both sides have time slot arrays -> Jaccard similarity
+        if isinstance(volunteer_availability, list) and isinstance(opportunity_commitment_or_slots, list):
+            vol = set(slot.lower() for slot in volunteer_availability)
+            opp = set(slot.lower() for slot in opportunity_commitment_or_slots)
+            if not vol or not opp:
+                return 0.5
+            intersection = len(vol & opp)
+            union = len(vol | opp)
+            return intersection / union if union else 0.5
+
+        # Fallback to legacy mapping (string categories)
+        volunteer_avail_str = str(volunteer_availability) if volunteer_availability is not None else ""
+        opportunity_commitment = str(opportunity_commitment_or_slots) if opportunity_commitment_or_slots is not None else ""
+        availability_scores = {
+            ("1-2", "minimal"): 1.0,
+            ("1-2", "moderate"): 0.3,
+            ("1-2", "significant"): 0.1,
+            ("3-5", "minimal"): 0.8,
+            ("3-5", "moderate"): 1.0,
+            ("3-5", "significant"): 0.6,
+            ("6-10", "moderate"): 0.9,
+            ("6-10", "significant"): 1.0,
+            ("6-10", "extensive"): 0.8,
+            ("10+", "significant"): 0.9,
+            ("10+", "extensive"): 1.0,
+        }
+        key = (volunteer_avail_str, opportunity_commitment.lower() if opportunity_commitment else "moderate")
+        return availability_scores.get(key, 0.5)
+
+    def _calculate_experience_match(self, volunteer_exp: str, required_exp: str) -> float:
+        """Calculate experience level matching"""
+        if not required_exp:
+            return 0.8  # Good match if no specific experience required
+        
+        experience_levels = {
+            "beginner": 1,
+            "intermediate": 2,
+            "advanced": 3,
+            "expert": 4,
+        }
+        
+        vol_level = experience_levels.get(volunteer_exp.lower(), 1)
+        req_level = experience_levels.get(required_exp.lower(), 1)
+        
+        # Perfect match if levels are equal
+        if vol_level == req_level:
+            return 1.0
+        
+        # Good match if volunteer has higher experience
+        if vol_level > req_level:
+            return max(0.8 - (vol_level - req_level) * 0.1, 0.5)
+        
+        # Lower match if volunteer has less experience
+        return max(0.6 - (req_level - vol_level) * 0.2, 0.1)
+
+    def _calculate_cause_match(self, volunteer_causes: List[str], opportunity_causes: List[str]) -> float:
+        """Calculate cause alignment score"""
+        if not opportunity_causes or not volunteer_causes:
+            return 0.5  # Neutral if causes not specified
+        
+        vol_causes = set(cause.lower().strip() for cause in volunteer_causes)
+        opp_causes = set(cause.lower().strip() for cause in opportunity_causes)
+        
+        intersection = vol_causes.intersection(opp_causes)
+        union = vol_causes.union(opp_causes)
+        
+        if not union:
+            return 0.5
+        
+        # Jaccard similarity
+        return len(intersection) / len(union)
+
+    def _calculate_time_commitment_match(self, volunteer_availability: str, opportunity_hours: int) -> float:
+        """Calculate time commitment matching"""
+        if not volunteer_availability or not opportunity_hours:
+            return 0.6  # Neutral if time not specified
+        
+        # Map availability to hours per week
+        availability_hours = {
+            "1-2": 1.5,
+            "3-5": 4,
+            "6-10": 8,
+            "10+": 15
+        }
+        
+        volunteer_hours = availability_hours.get(volunteer_availability, 4)
+        
+        # Calculate ratio (smaller/larger to get value <= 1)
+        ratio = min(volunteer_hours, opportunity_hours) / max(volunteer_hours, opportunity_hours)
+        return ratio
+
+    def _calculate_interest_match(self, volunteer_interests: List[str], activity_types: List[str]) -> float:
+        """Calculate interest/activity type matching"""
+        if not activity_types or not volunteer_interests:
+            return 0.5  # Neutral if not specified
+        
+        vol_interests = set(interest.lower().strip() for interest in volunteer_interests)
+        opp_activities = set(activity.lower().strip() for activity in activity_types)
+        
+        intersection = vol_interests.intersection(opp_activities)
+        
+        if not opp_activities:
+            return 0.5
+        
+        return len(intersection) / len(opp_activities)
+
+    def _generate_explanations(self, volunteer: Dict[str, Any], opportunity: Dict[str, Any], components: Dict[str, float]) -> List[str]:
+        """Generate human-readable match explanations"""
+        explanations = []
+        
+        # Skills
+        if components.get("skill_match", 0) > 0.7:
+            matching_skills = set(volunteer.get("skills", [])) & set(opportunity.get("requiredSkills", []))
+            if matching_skills:
+                explanations.append(f"Strong skills match: {', '.join(list(matching_skills)[:3])}")
+        
+        # Location
+        if opportunity.get("remoteAllowed", False):
+            explanations.append("Remote work available")
+        elif components.get("location_match", 0) > 0.8:
+            explanations.append("Same location")
+        
+        # Causes
+        if components.get("cause_match", 0) > 0.6:
+            matching_causes = set(volunteer.get("causes", [])) & set(opportunity.get("causes", []))
+            if matching_causes:
+                explanations.append(f"Shared cause: {list(matching_causes)[0]}")
+        
+        # Experience
+        if components.get("experience_match", 0) > 0.8:
+            explanations.append("Good experience match")
+        
+        return explanations[:4]  # Return top 4 reasons
     
     def rank_opportunities(
         self,
@@ -129,9 +337,18 @@ class MatchingAlgorithm:
         limit: int = 10
     ) -> List[Tuple[Dict[str, Any], MatchScore]]:
         """Rank opportunities for a volunteer"""
-        
+        # Simple pre-filter: opportunity must have some skill or time overlap
         scored = []
         for opportunity in opportunities:
+            # Compute availability overlap against timeSlots if present
+            opp_slots = opportunity.get("timeSlots", [])
+            avail_score = self._calculate_availability_match(volunteer.get("availability", []), opp_slots)
+            # Compute skill overlap roughly
+            skill_score = self._calculate_skill_match(volunteer.get("skills", []), opportunity.get("requiredSkills", []))
+            # Skip totally irrelevant opportunities
+            if (avail_score < 0.2) and (skill_score < 0.2):
+                continue
+
             score = self.calculate_match_score(volunteer, opportunity)
             
             # Only include if minimum threshold met

@@ -204,6 +204,7 @@ class UpdateProfileRequest(BaseModel):
     email: Optional[str] = Field(None, description="User's email address")
     phone: Optional[str] = Field(None, description="User's phone")
     location: Optional[str] = Field(None, description="User's location")
+    bio: Optional[str] = Field(None, description="User bio")
     skills: Optional[List[str]] = Field(None, description="User's skills")
     interests: Optional[List[str]] = Field(None, description="User interests")
     availability: Optional[Dict[str, Optional[bool]]] = Field(None, description="Time availability flags")
@@ -214,6 +215,28 @@ class ReviewApplicationRequest(BaseModel):
     decision: str = Field(..., description="Review decision: accept or reject")
     reviewerNotes: Optional[str] = Field(None, max_length=2000, description="Optional reviewer notes")
     reviewerId: Optional[str] = Field(None, description="ID of the reviewer")
+
+
+class CompleteApplicationRequest(BaseModel):
+    notes: Optional[str] = Field(None, max_length=2000, description="Optional completion notes/reason")
+
+
+class CreateOpportunityPayload(BaseModel):
+    organization_id: str
+    title: str
+    description: str
+    category: Optional[str] = None
+    location: str
+    is_remote: bool = False
+    skills_required: List[str] = []
+    time_commitment: Optional[str] = None
+    start_date: datetime
+    end_date: Optional[datetime] = None
+    max_volunteers: int = 1
+    application_deadline: Optional[datetime] = None
+    contact_email: str
+    requirements: Optional[str] = None
+    benefits: Optional[str] = None
 
 
 
@@ -300,10 +323,16 @@ async def get_clean_volunteer_profile(volunteer_id: str, auth_header: str | None
                         "email": user_data.get("email", ""),
                         "phone": None,
                         "location": None,
+                        "bio": None,
                         "skills": [],
                         "interests": [],
                         "availability": None,
                         "profileImageUrl": None,
+                        "points": 0,
+                        "level": 1,
+                        "badges": [],
+                        "totalHours": 0,
+                        "completedApplications": 0,
                         "createdAt": user_data.get("createdAt", datetime.now(UTC).isoformat()),
                         "updatedAt": None,
                     }
@@ -318,10 +347,16 @@ async def get_clean_volunteer_profile(volunteer_id: str, auth_header: str | None
         "email": "",
         "phone": None,
         "location": None,
+        "bio": None,
         "skills": [],
         "interests": [],
         "availability": None,
         "profileImageUrl": None,
+        "points": 0,
+        "level": 1,
+        "badges": [],
+        "totalHours": 0,
+        "completedApplications": 0,
         "createdAt": now,
         "updatedAt": None,
     }
@@ -366,6 +401,7 @@ async def services_health_check():
     applications_healthy = await applications_adapter.health_check()
     matching_healthy = await matching_adapter.health_check()
     auth_healthy = await auth_adapter.health_check()
+    opportunities_healthy = await check_service_health("opportunities")
     
     # Use health checker for consistent status reporting
     health_result = await health_checker.check_health(use_cache=False)
@@ -382,7 +418,8 @@ async def services_health_check():
     response_data["legacy_checks"] = {
         "applications": "healthy" if applications_healthy else "unhealthy",
         "matching": "healthy" if matching_healthy else "unhealthy",
-        "auth": "healthy" if auth_healthy else "unhealthy"
+        "auth": "healthy" if auth_healthy else "unhealthy",
+        "opportunities": "healthy" if opportunities_healthy else "unhealthy",
     }
     
     return response_data
@@ -647,6 +684,7 @@ applications_adapter = ApplicationsAdapter(service_registry)
 matching_adapter = MatchingAdapter(service_registry)
 auth_adapter = AuthAdapter(service_registry)
 
+
 # Initialize health checker with service dependencies
 health_checker = create_service_health_checker("bff")
 
@@ -687,6 +725,13 @@ health_checker.add_dependency(
     lambda: check_service_health("auth"),
     timeout_seconds=5.0,
     critical=True  # Auth is critical for BFF functionality
+)
+
+health_checker.add_dependency(
+    "opportunities_service",
+    lambda: check_service_health("opportunities"),
+    timeout_seconds=5.0,
+    critical=False
 )
 
 
@@ -891,11 +936,20 @@ async def get_volunteer_dashboard(volunteer_id: str, req: Request):
         # Get applications from applications service
         auth_header = req.headers.get('Authorization')
         applications = await applications_adapter.get_volunteer_applications(volunteer_id, authorization=auth_header)
-        
-        # Filter for active applications (not in final states) and map to contract schema
+
+        # Aggregate volunteer application stats
+        status_counts = { 'pending': 0, 'approved': 0, 'rejected': 0, 'withdrawn': 0 }
+        for app in applications:
+            s = str(app.get('status'))
+            if s in status_counts:
+                status_counts[s] += 1
+
+        # Filter for active applications (exclude terminal states) and map to contract schema
+        # Note: external statuses are: pending, approved, rejected, withdrawn
+        # Treat approved as active (represents accepted/in-progress), until a distinct 'completed' is exposed
         active_applications_internal = [
-            app for app in applications 
-            if app.get('status') not in ['completed', 'cancelled', 'rejected']
+            app for app in applications
+            if str(app.get('status')) not in ['rejected', 'withdrawn']
         ]
         active_applications = [_to_contract_application(app) for app in active_applications_internal]
         
@@ -905,11 +959,20 @@ async def get_volunteer_dashboard(volunteer_id: str, req: Request):
         
         # Get clean profile data using real user information
         profile = await get_clean_volunteer_profile(volunteer_id, auth_header)
+        # Keep profile as returned from Auth; application aggregation is provided separately
         
         dashboard_data = {
             "profile": profile,
             "activeApplications": active_applications,
-            "recentMatches": recent_matches
+            "recentMatches": recent_matches,
+            "applicationStats": {
+                "totalApplications": len(applications),
+                "pending": status_counts['pending'],
+                "approved": status_counts['approved'],
+                "rejected": status_counts['rejected'],
+                "withdrawn": status_counts['withdrawn'],
+                "active": len(active_applications_internal),
+            }
         }
         
         duration_ms = int((datetime.now(UTC) - start_time).total_seconds() * 1000)
@@ -921,6 +984,7 @@ async def get_volunteer_dashboard(volunteer_id: str, req: Request):
             volunteerId=volunteer_id,
             activeApplicationCount=len(active_applications),
             recentMatchCount=len(recent_matches),
+            totalApplicationCount=len(applications),
             durationMs=duration_ms
         )
         
@@ -972,7 +1036,7 @@ async def update_volunteer_profile(volunteer_id: str, request: UpdateProfileRequ
         logger.info(f"Updating profile for volunteer_id: {volunteer_id}")
 
         payload: Dict[str, Any] = {}
-        for key in ["name", "email", "phone", "location", "skills", "interests", "availability", "profileImageUrl"]:
+        for key in ["name", "email", "phone", "location", "bio", "skills", "interests", "availability", "profileImageUrl"]:
             value = getattr(request, key, None)
             if value is not None:
                 payload[key] = value
@@ -987,6 +1051,24 @@ async def update_volunteer_profile(volunteer_id: str, request: UpdateProfileRequ
     except Exception as e:
         logger.error(f"Failed to update profile for volunteer_id: {volunteer_id}, error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to update profile: {str(e)}")
+
+
+@app.get("/api/volunteer/{volunteer_id}/profile")
+async def get_volunteer_profile(volunteer_id: str, req: Request):
+    """Fetch volunteer profile by delegating to Auth service profile API using caller's token."""
+    try:
+        auth_header = req.headers.get("Authorization", "")
+        if not auth_header:
+            err = StandardErrorResponse(error="unauthorized", message="Missing authorization header", code=401)
+            raise HTTPException(status_code=401, detail=err.model_dump())
+
+        profile = await auth_adapter.get_profile(auth_header)
+        return profile
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch profile for volunteer_id: {volunteer_id}, error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch profile: {str(e)}")
 
 
 # Organization endpoints for application management
@@ -1032,10 +1114,10 @@ async def get_organization_applications(org_id: str, req: Request):
 
 @app.post("/api/applications/{application_id}/review", status_code=200)
 async def review_application(application_id: str, request: ReviewApplicationRequest, req: Request):
-    """Review an application (organization endpoint)"""
+    """Review an application (organization endpoint) using state machine PATCH API"""
     trace_id = get_trace_id(req)
     auth_header = req.headers.get('Authorization')
-    
+
     log_structured(
         logger, "INFO", "BFF application review request",
         trace_id=trace_id,
@@ -1043,55 +1125,52 @@ async def review_application(application_id: str, request: ReviewApplicationRequ
         applicationId=application_id,
         decision=request.decision
     )
-    
+
     try:
-        # Call applications service to process the review via direct HTTP for now
-        # TODO: Move this to applications adapter when review endpoint is implemented there
+        # Ensure the application is in reviewing state, then apply decision via state machine
+        # Best-effort 'review' transition; ignore if already reviewing/accepted
         try:
-            applications_url = await service_registry.get_service_url("applications")
-        except Exception:
-            applications_url = "http://localhost:8001"
-            
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                f"{applications_url}/api/applications/{application_id}/review",
-                json={
-                    "decision": request.decision,
-                    "reviewerNotes": request.reviewerNotes,
-                    "reviewerId": request.reviewerId
-                },
-                headers=({"Authorization": auth_header} if auth_header else None)
+            await applications_adapter.update_application_state(
+                application_id=application_id,
+                action="review",
+                reason=request.reviewerNotes,
+                authorization=auth_header,
             )
-            
-            if response.status_code == 200:
-                application = response.json()
-                
-                log_structured(
-                    logger, "INFO", "BFF application review response",
-                    trace_id=trace_id,
-                    operation="review_application",
-                    applicationId=application_id,
-                    decision=request.decision,
-                    newStatus=application.get('status')
-                )
-                
-                # Log business metric
-                log_business_metric(
-                    logger, f"bff_application_reviewed_{request.decision}", 1,
-                    trace_id=trace_id,
-                    applicationId=application_id
-                )
-                
-                return application
-            else:
-                err = StandardErrorResponse(
-                    error="upstream_error", 
-                    message="Applications service error", 
-                    code=response.status_code,
-                    details={"body": response.text}
-                )
-                raise HTTPException(status_code=response.status_code, detail=err.model_dump())
-                
+        except HTTPException as e:
+            # If invalid transition (already reviewed), proceed
+            if e.status_code != 400:
+                raise
+
+        # Apply decision: accept or reject
+        if request.decision not in ("accept", "reject"):
+            err = StandardErrorResponse(error="validation_error", message="Decision must be 'accept' or 'reject'", code=400)
+            raise HTTPException(status_code=400, detail=err.model_dump())
+
+        application = await applications_adapter.update_application_state(
+            application_id=application_id,
+            action=request.decision,
+            reason=request.reviewerNotes,
+            authorization=auth_header,
+        )
+
+        log_structured(
+            logger, "INFO", "BFF application review response",
+            trace_id=trace_id,
+            operation="review_application",
+            applicationId=application_id,
+            decision=request.decision,
+            newStatus=application.get('status')
+        )
+
+        # Log business metric
+        log_business_metric(
+            logger, f"bff_application_reviewed_{request.decision}", 1,
+            trace_id=trace_id,
+            applicationId=application_id
+        )
+
+        return application
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1099,6 +1178,58 @@ async def review_application(application_id: str, request: ReviewApplicationRequ
             logger, "ERROR", "BFF application review failed",
             trace_id=trace_id,
             operation="review_application",
+            applicationId=application_id,
+            error=str(e)
+        )
+        err = StandardErrorResponse(error="service_error", message="Service temporarily unavailable", code=503)
+        raise HTTPException(status_code=503, detail=err.model_dump())
+
+
+@app.post("/api/applications/{application_id}/complete", status_code=200)
+async def complete_application(application_id: str, request: CompleteApplicationRequest | None = None, req: Request):
+    """Mark an application as completed (volunteer action or org confirmation)."""
+    trace_id = get_trace_id(req)
+    auth_header = req.headers.get('Authorization') if req else None
+
+    log_structured(
+        logger, "INFO", "BFF application complete request",
+        trace_id=trace_id,
+        operation="complete_application",
+        applicationId=application_id
+    )
+
+    try:
+        reason = request.notes if request else None
+        application = await applications_adapter.update_application_state(
+            application_id=application_id,
+            action="complete",
+            reason=reason,
+            authorization=auth_header,
+        )
+
+        log_structured(
+            logger, "INFO", "BFF application complete response",
+            trace_id=trace_id,
+            operation="complete_application",
+            applicationId=application_id,
+            newStatus=application.get('status')
+        )
+
+        # Metric
+        log_business_metric(
+            logger, "bff_application_completed", 1,
+            trace_id=trace_id,
+            applicationId=application_id,
+        )
+
+        return application
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_structured(
+            logger, "ERROR", "BFF application complete failed",
+            trace_id=trace_id,
+            operation="complete_application",
             applicationId=application_id,
             error=str(e)
         )
@@ -1185,12 +1316,16 @@ async def get_opportunity_details(opportunity_id: str, req: Request):
     )
     
     try:
-        # Call opportunities service directly
-        opportunities_url = os.getenv('OPPORTUNITIES_SERVICE_URL', 'http://localhost:8003')
-        async with httpx.AsyncClient() as client:
+        # Resolve opportunities service via service registry, with env fallback
+        try:
+            opportunities_url = await service_registry.get_service_url("opportunities")
+        except Exception:
+            opportunities_url = os.getenv('OPPORTUNITIES_SERVICE_URL', 'http://localhost:8006')
+        auth_header = req.headers.get('Authorization')
+        async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
                 f"{opportunities_url}/api/opportunities/{opportunity_id}",
-                timeout=10.0
+                headers=({"Authorization": auth_header} if auth_header else None)
             )
             
             if response.status_code == 404:
@@ -1236,12 +1371,16 @@ async def get_organization_opportunities(org_id: str, req: Request):
     )
     
     try:
-        # Call opportunities service directly
-        opportunities_url = os.getenv('OPPORTUNITIES_SERVICE_URL', 'http://localhost:8003')
-        async with httpx.AsyncClient() as client:
+        # Resolve opportunities service via service registry, with env fallback
+        try:
+            opportunities_url = await service_registry.get_service_url("opportunities")
+        except Exception:
+            opportunities_url = os.getenv('OPPORTUNITIES_SERVICE_URL', 'http://localhost:8006')
+        auth_header = req.headers.get('Authorization')
+        async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
                 f"{opportunities_url}/api/opportunities/organization/{org_id}",
-                timeout=10.0
+                headers=({"Authorization": auth_header} if auth_header else None)
             )
             
             if response.status_code == 404:
@@ -1268,6 +1407,120 @@ async def get_organization_opportunities(org_id: str, req: Request):
             trace_id=trace_id,
             operation="get_organization_opportunities",
             organizationId=org_id,
+            error=str(e)
+        )
+        err = StandardErrorResponse(error="service_error", message="Service temporarily unavailable", code=503)
+        raise HTTPException(status_code=503, detail=err.model_dump())
+
+
+@app.post("/api/opportunities")
+async def create_opportunity(request: CreateOpportunityPayload, req: Request):
+    """Create a new opportunity via the opportunities service"""
+    trace_id = get_trace_id(req)
+    auth_header = req.headers.get('Authorization')
+
+    log_structured(
+        logger, "INFO", "BFF create opportunity request",
+        trace_id=trace_id,
+        operation="create_opportunity",
+        organizationId=request.organization_id,
+        title=request.title
+    )
+
+    try:
+        try:
+            opportunities_url = await service_registry.get_service_url("opportunities")
+        except Exception:
+            opportunities_url = os.getenv('OPPORTUNITIES_SERVICE_URL', 'http://localhost:8006')
+
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.post(
+                f"{opportunities_url}/api/opportunities",
+                json=request.model_dump(),
+                headers=({"Authorization": auth_header} if auth_header else None)
+            )
+
+            if response.status_code not in (200, 201):
+                err = StandardErrorResponse(
+                    error="upstream_error",
+                    message="Opportunities service error",
+                    code=response.status_code,
+                    details={"body": response.text}
+                )
+                raise HTTPException(status_code=response.status_code, detail=err.model_dump())
+
+            data = response.json()
+            log_structured(
+                logger, "INFO", "BFF create opportunity success",
+                trace_id=trace_id,
+                operation="create_opportunity",
+                opportunityId=data.get('id')
+            )
+            return data
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_structured(
+            logger, "ERROR", "BFF create opportunity failed",
+            trace_id=trace_id,
+            operation="create_opportunity",
+            error=str(e)
+        )
+        err = StandardErrorResponse(error="service_error", message="Service temporarily unavailable", code=503)
+        raise HTTPException(status_code=503, detail=err.model_dump())
+
+
+@app.get("/api/opportunities/{opportunity_id}/applications")
+async def get_opportunity_applications(opportunity_id: str, req: Request):
+    """Fetch applications for a given opportunity via Applications service"""
+    trace_id = get_trace_id(req)
+    auth_header = req.headers.get('Authorization')
+
+    log_structured(
+        logger, "INFO", "BFF opportunity applications request",
+        trace_id=trace_id,
+        operation="get_opportunity_applications",
+        opportunityId=opportunity_id
+    )
+
+    try:
+        try:
+            applications_url = await service_registry.get_service_url("applications")
+        except Exception:
+            applications_url = os.getenv('APPLICATIONS_SERVICE_URL', 'http://localhost:8001')
+
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(
+                f"{applications_url}/api/applications/opportunity/{opportunity_id}",
+                headers=({"Authorization": auth_header} if auth_header else None)
+            )
+
+            if response.status_code != 200:
+                err = StandardErrorResponse(
+                    error="upstream_error",
+                    message="Applications service error",
+                    code=response.status_code,
+                    details={"body": response.text}
+                )
+                raise HTTPException(status_code=response.status_code, detail=err.model_dump())
+
+            apps = response.json()
+            log_structured(
+                logger, "INFO", "BFF opportunity applications success",
+                trace_id=trace_id,
+                operation="get_opportunity_applications",
+                opportunityId=opportunity_id,
+                applicationCount=len(apps)
+            )
+            return apps
+    except HTTPException:
+        raise
+    except Exception as e:
+        log_structured(
+            logger, "ERROR", "BFF opportunity applications failed",
+            trace_id=trace_id,
+            operation="get_opportunity_applications",
+            opportunityId=opportunity_id,
             error=str(e)
         )
         err = StandardErrorResponse(error="service_error", message="Service temporarily unavailable", code=503)

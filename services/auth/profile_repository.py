@@ -55,10 +55,17 @@ class ProfileRepository:
                 "email": base_email,
                 "phone": None,
                 "location": None,
+                "bio": None,
                 "skills": [],
                 "interests": [],
                 "availability": None,
                 "profileImageUrl": None,
+                # Defaults for new users to avoid mock data confusion
+                "points": 0,
+                "level": 1,
+                "badges": [],
+                "totalHours": 0,
+                "completedApplications": 0,
                 "createdAt": now,
                 "updatedAt": None,
             }
@@ -74,6 +81,8 @@ class ProfileRepository:
                 profile["phone"] = update.phone
             if update.location is not None:
                 profile["location"] = update.location
+            if update.bio is not None:
+                profile["bio"] = update.bio
             if update.skills is not None:
                 profile["skills"] = list(update.skills)
             if update.interests is not None:
@@ -88,3 +97,44 @@ class ProfileRepository:
         self._persist()
         return VolunteerProfile(**profile)
 
+    def add_points(self, user_id: UUID, points: int) -> VolunteerProfile:
+        """Increment points for a user's profile, adjusting level deterministically.
+        Simple scheme: every 100 points = +1 level, starting at level 1.
+        """
+        existing = self._cache.get(str(user_id))
+        now = datetime.utcnow().isoformat()
+        if existing is None:
+            # Create a minimal profile if missing; name/email unknown in this context
+            profile = {
+                "id": str(uuid4()),
+                "userId": str(user_id),
+                "name": "",
+                "email": "",
+                "phone": None,
+                "location": None,
+                "bio": None,
+                "skills": [],
+                "interests": [],
+                "availability": None,
+                "profileImageUrl": None,
+                "points": max(0, points),
+                "level": 1,
+                "badges": [],
+                "totalHours": 0,
+                "completedApplications": 0,
+                "createdAt": now,
+                "updatedAt": now,
+            }
+        else:
+            profile = dict(existing)
+            current_points = int(profile.get("points", 0))
+            profile["points"] = max(0, current_points + max(0, points))
+            profile["updatedAt"] = now
+
+        # Recalculate level: 0-99 -> 1; 100-199 -> 2; etc.
+        p = int(profile.get("points", 0))
+        profile["level"] = max(1, (p // 100) + 1)
+
+        self._cache[str(user_id)] = profile
+        self._persist()
+        return VolunteerProfile(**profile)

@@ -29,12 +29,22 @@ export interface LoginResponse {
   tokens: AuthTokens;
 }
 
+export interface ApplicationStats {
+  totalApplications: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  withdrawn: number;
+  active: number;
+}
+
 export interface VolunteerDashboardResponse {
   profile: {
     id: string;
     email: string;
     firstName: string;
     lastName: string;
+    points?: number;
     level: number;
     status: string;
     skills: string[];
@@ -78,6 +88,7 @@ export interface VolunteerDashboardResponse {
     generatedAt: string;
     status: string;
   }>;
+  applicationStats?: ApplicationStats;
 }
 
 export interface ApiResponse<T = any> {
@@ -230,12 +241,21 @@ export class VolunteerApi extends BaseClient {
     return this.request<any>('POST', '/volunteer/apply', data);
   }
   
+  async completeApplication(applicationId: string, notes?: string): Promise<any> {
+    const body = notes ? { notes } : undefined;
+    return this.request<any>('POST', `/applications/${applicationId}/complete`, body);
+  }
+  
   async getVolunteerDashboard(volunteerId: string): Promise<VolunteerDashboardResponse> {
     return this.request<VolunteerDashboardResponse>('GET', `/volunteer/${volunteerId}/dashboard`);
   }
   
   async getApplications(volunteerId: string): Promise<any[]> {
     return this.request<any[]>('GET', `/volunteer/${volunteerId}/applications`);
+  }
+
+  async getVolunteerProfile(volunteerId: string): Promise<any> {
+    return this.request<any>('GET', `/volunteer/${volunteerId}/profile`);
   }
 
   async updateVolunteerProfile(
@@ -245,6 +265,7 @@ export class VolunteerApi extends BaseClient {
       email?: string;
       phone?: string;
       location?: string;
+      bio?: string;
       skills?: string[];
       interests?: string[];
       availability?: { weekdays?: boolean; weekends?: boolean; evenings?: boolean };

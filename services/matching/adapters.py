@@ -71,18 +71,20 @@ class OpportunitiesServiceAdapter:
                     params["category"] = filters["category"]
                 if "organization_id" in filters:
                     params["organization_id"] = filters["organization_id"]
-            
+
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(
                     f"{self.base_url}/api/opportunities",
                     params=params
                 )
-                
+
                 if response.status_code == 200:
                     opportunities = response.json()
                     # Convert to internal format expected by matching algorithm
                     converted_opportunities = []
                     for opp in opportunities:
+                        # Parse hours per week if present (very simple heuristic)
+                        hours = self._parse_time_commitment_hours(opp.get("time_commitment"))
                         converted_opportunities.append({
                             "id": opp["id"],
                             "organizationId": opp["organization_id"],
@@ -90,7 +92,12 @@ class OpportunitiesServiceAdapter:
                             "description": opp["description"],
                             "requiredSkills": opp.get("skills_required", []),
                             "timeSlots": self._extract_time_slots(opp),
-                            "location": self._extract_location_coordinates(opp["location"]),
+                            # Coordinates for distance-based score
+                            "location": self._extract_location_coordinates(opp.get("location", "")),
+                            # Remote allowed flag
+                            "remoteAllowed": bool(opp.get("is_remote", False)),
+                            # Optional numeric hours estimate for compatibility
+                            "timeCommitmentHours": hours,
                             "category": self._categorize_opportunity(opp),
                         })
                     return converted_opportunities
@@ -142,6 +149,41 @@ class OpportunitiesServiceAdapter:
             coords = {"latitude": 30.0444, "longitude": 31.2357}
         
         return coords
+
+    def _parse_time_commitment_hours(self, time_commitment: Optional[str]) -> Optional[int]:
+        """Very simple parser to estimate weekly hours from a free-text time commitment string.
+
+        Examples:
+        - "1-2" -> 2
+        - "3-5" -> 4
+        - "6-10" -> 8
+        - "10+" -> 10
+        - "5 hours/week" -> 5
+        """
+        if not time_commitment or not isinstance(time_commitment, str):
+            return None
+        s = time_commitment.strip().lower()
+        try:
+            if "+" in s:
+                # e.g. "10+"
+                num = s.split("+")[0]
+                return int(num)
+            if "-" in s:
+                a, b = s.split("-", 1)
+                a = ''.join(ch for ch in a if ch.isdigit())
+                b = ''.join(ch for ch in b if ch.isdigit())
+                if a and b:
+                    return (int(a) + int(b)) // 2
+            # Fallback: scan for first integer in string
+            num = ""
+            for ch in s:
+                if ch.isdigit():
+                    num += ch
+                elif num:
+                    break
+            return int(num) if num else None
+        except Exception:
+            return None
     
     def _categorize_opportunity(self, opportunity: Dict[str, Any]) -> str:
         """Categorize opportunity based on title/description"""

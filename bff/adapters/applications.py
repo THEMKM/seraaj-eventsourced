@@ -127,3 +127,47 @@ class ApplicationsAdapter:
                 return response.status_code == 200
         except Exception:
             return False
+
+    async def update_application_state(
+        self,
+        application_id: str,
+        action: str,
+        reason: Optional[str] = None,
+        authorization: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """PATCH application state via Applications service state machine endpoint"""
+        async def _make_request():
+            base_url = await self._get_service_url()
+            payload: Dict[str, Any] = {"action": action}
+            if reason:
+                payload["reason"] = reason
+
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.patch(
+                    f"{base_url}/api/applications/{application_id}/state",
+                    json=payload,
+                    headers=({"Authorization": authorization} if authorization else None)
+                )
+
+                if response.status_code in (200, 201):
+                    return response.json()
+                elif response.status_code == 400:
+                    # Surface validation detail
+                    raise HTTPException(status_code=400, detail=f"Invalid state transition: {response.text}")
+                elif response.status_code == 404:
+                    raise HTTPException(status_code=404, detail="Application not found")
+                else:
+                    raise HTTPException(status_code=response.status_code, detail=f"Applications service error: {response.text}")
+
+        try:
+            return await self.circuit_breaker.acall(_make_request)
+        except CircuitBreakerOpenException as e:
+            logger.warning(f"Circuit breaker open for {self.service_name}: {e}")
+            err = StandardErrorResponse(error="service_unavailable", message="Applications service temporarily unavailable", code=503)
+            raise HTTPException(status_code=503, detail=err.model_dump())
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Applications service call failed: {e}")
+            err = StandardErrorResponse(error="service_error", message="Applications service error", code=503, details={"reason": str(e)})
+            raise HTTPException(status_code=503, detail=err.model_dump())

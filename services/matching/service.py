@@ -78,9 +78,14 @@ class MatchingService:
                 volunteerId=volunteer_id,
                 opportunityId=opportunity["id"],
                 organizationId=opportunity["organizationId"],
-                score=score.total,
-                scoreComponents=score.components,
-                explanation=score.explanation,
+                # Scale to 0-100 as per shared model
+                score=round(score.total * 100, 2),
+                # Extras are ignored by the model, but we still pass reasons below
+                # to preserve human-friendly explanations when serialized
+                # scoreComponents=score.components,
+                # explanation=score.explanation,
+                reasons=score.explanation,
+                opportunityTitle=opportunity.get("title"),
                 generatedAt=datetime.now(UTC),
                 status="active"
             )
@@ -128,9 +133,9 @@ class MatchingService:
                 volunteerId=volunteer_id,
                 opportunityId=opportunity["id"],
                 organizationId=opportunity["organizationId"],
-                score=score.total,
-                scoreComponents=score.components,
-                explanation=score.explanation,
+                score=round(score.total * 100, 2),
+                reasons=score.explanation,
+                opportunityTitle=opportunity.get("title"),
                 generatedAt=datetime.now(UTC),
                 status="active"
             )

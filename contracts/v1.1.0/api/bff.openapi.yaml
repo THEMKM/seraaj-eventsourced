@@ -348,6 +348,71 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VolunteerDashboardResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Service temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /applications/{application_id}/complete:
+    post:
+      operationId: completeApplication
+      summary: Mark an application as completed
+      description: Trigger completion for an accepted application; publishes completion and points events
+      tags:
+        - Applications
+      parameters:
+        - in: path
+          name: application_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Application identifier
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notes:
+                  type: string
+                  maxLength: 2000
+                  description: Optional completion notes
+              additionalProperties: false
+      responses:
+        '200':
+          description: Application marked as completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Application'
+        '400':
+          description: Invalid state transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Application not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Service temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '401':
           description: Unauthorized
           content:
@@ -362,6 +427,78 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Volunteer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /volunteer/{volunteerId}/profile:
+    get:
+      operationId: getVolunteerProfile
+      summary: Get volunteer profile (authenticated)
+      tags:
+        - Volunteer
+      parameters:
+        - name: volunteerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the volunteer
+      responses:
+        '200':
+          description: Volunteer profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthVolunteerProfile'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      operationId: updateVolunteerProfile
+      summary: Update volunteer profile (authenticated)
+      tags:
+        - Volunteer
+      parameters:
+        - name: volunteerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID of the volunteer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateVolunteerProfileRequest'
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateVolunteerProfileResponse'
+        '401':
+          description: Unauthorized
           content:
             application/json:
               schema:
@@ -516,6 +653,8 @@ components:
           type: string
         location:
           type: string
+        bio:
+          type: string
         skills:
           type: array
           items:
@@ -524,18 +663,57 @@ components:
           type: array
           items:
             type: string
+            enum: 
+              - Direct Service
+              - Advocacy
+              - Research
+              - Capacity Building
+              - Emergency Response
+              - Policy Work
+              - Creative Projects
+              - Technology Solutions
+              - Community Outreach
+              - Training & Workshops
+        causes:
+          type: array
+          items:
+            type: string
+            enum:
+              - Education
+              - Health
+              - Environment
+              - Poverty
+              - Human Rights
+              - Refugees
+              - Women Empowerment
+              - Youth Development
+              - Elderly Care
+              - Disability Support
+              - Mental Health
+              - Community Development
+              - Food Security
+              - Water & Sanitation
+              - Technology for Good
         availability:
-          type: object
-          properties:
-            weekdays:
-              type: boolean
-            weekends:
-              type: boolean
-            evenings:
-              type: boolean
+          type: string
+          enum: ["1-2", "3-5", "6-10", "10+"]
+          description: Hours per week availability
+        experienceLevel:
+          type: string
+          enum: [beginner, intermediate, advanced, expert]
+          default: beginner
         profileImageUrl:
           type: string
           format: uri
+        # Organization-specific fields
+        organizationName:
+          type: string
+        organizationType:
+          type: string
+          enum: [nonprofit, charity, ngo, social-enterprise, community-group]
+        organizationSize:
+          type: string
+          enum: ["1-5", "6-20", "21-50", "50+"]
 
     VolunteerDashboardResponse:
       type: object
@@ -551,6 +729,130 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MatchSuggestion'
+        applicationStats:
+          $ref: '#/components/schemas/ApplicationStats'
+
+    ApplicationStats:
+      type: object
+      description: Aggregated application statistics for a volunteer
+      properties:
+        totalApplications:
+          type: integer
+          minimum: 0
+        pending:
+          type: integer
+          minimum: 0
+        approved:
+          type: integer
+          minimum: 0
+        rejected:
+          type: integer
+          minimum: 0
+        withdrawn:
+          type: integer
+          minimum: 0
+        active:
+          type: integer
+          minimum: 0
+      additionalProperties: false
+
+    # Auth-managed volunteer profile (as stored by Auth service)
+    AuthAvailability:
+      type: object
+      properties:
+        weekdays:
+          type: boolean
+        weekends:
+          type: boolean
+        evenings:
+          type: boolean
+      additionalProperties: false
+
+    AuthVolunteerProfile:
+      type: object
+      required: [id, userId, name, email, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        skills:
+          type: array
+          items:
+            type: string
+        interests:
+          type: array
+          items:
+            type: string
+        availability:
+          $ref: '#/components/schemas/AuthAvailability'
+        profileImageUrl:
+          type: string
+          format: uri
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    UpdateVolunteerProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        location:
+          type: string
+        skills:
+          type: array
+          items:
+            type: string
+        interests:
+          type: array
+          items:
+            type: string
+        availability:
+          $ref: '#/components/schemas/AuthAvailability'
+        profileImageUrl:
+          type: string
+          format: uri
+      additionalProperties: false
+
+    UpdateVolunteerProfileResponse:
+      type: object
+      required: [id, profile, message]
+      properties:
+        id:
+          type: string
+          format: uuid
+        profile:
+          $ref: '#/components/schemas/AuthVolunteerProfile'
+        message:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
 
     ErrorResponse:
       type: object
