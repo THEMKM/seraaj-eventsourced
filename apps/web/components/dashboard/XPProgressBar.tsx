@@ -9,15 +9,18 @@ interface XPProgressBarProps {
 }
 
 export function XPProgressBar({ currentXP, level, nextLevelXP }: XPProgressBarProps) {
-  const xpInCurrentLevel = currentXP % nextLevelXP;
-  const progressPercent = (xpInCurrentLevel / nextLevelXP) * 100;
+  // Linear level scheme: each level requires +100 XP (points)
+  const prevLevelThreshold = Math.max(0, nextLevelXP - 100);
+  const xpInCurrentLevel = Math.max(0, currentXP - prevLevelThreshold);
+  const levelSpan = nextLevelXP - prevLevelThreshold || 100;
+  const progressPercent = Math.min(100, (xpInCurrentLevel / levelSpan) * 100);
 
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-electric-teal font-pixel text-sm">⭐ LEVEL {level}</span>
         <span className="text-pixel-coral font-pixel text-sm">
-          {xpInCurrentLevel}/{nextLevelXP} XP
+          {xpInCurrentLevel}/{levelSpan} XP
         </span>
       </div>
       <div className="relative h-4 clip-px border-px border-electric-teal bg-dark-surface/20 overflow-hidden">
@@ -32,7 +35,7 @@ export function XPProgressBar({ currentXP, level, nextLevelXP }: XPProgressBarPr
       </div>
       <div className="text-center">
         <span className="text-white font-pixel text-xs">
-          {nextLevelXP - xpInCurrentLevel} XP to Level {level + 1}
+          {Math.max(0, levelSpan - xpInCurrentLevel)} XP to Level {level + 1}
         </span>
       </div>
     </div>

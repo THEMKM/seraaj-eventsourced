@@ -23,6 +23,7 @@ export default function DashboardPage() {
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(true);
   const [selectedOpportunityId, setSelectedOpportunityId] = useState<string | null>(null);
   const [applicationMessage, setApplicationMessage] = useState('');
+  const [completingIds, setCompletingIds] = useState<Set<string>>(new Set());
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [gamificationData, setGamificationData] = useState<{
     totalXP: number;
@@ -32,6 +33,15 @@ export default function DashboardPage() {
   } | null>(null);
   const [avatarConfig, setAvatarConfig] = useState<AvatarConfig | null>(null);
   const [isAvatarSelectorOpen, setIsAvatarSelectorOpen] = useState(false);
+  const [showOnboardingReminder, setShowOnboardingReminder] = useState(false);
+
+  // Determine whether the volunteer profile appears incomplete
+  const isProfileIncomplete = (profile: any | null | undefined): boolean => {
+    if (!profile) return true;
+    const hasLocation = Boolean(profile.location && String(profile.location).trim());
+    const hasSkills = Array.isArray(profile.skills) && profile.skills.length > 0;
+    return !(hasLocation && hasSkills);
+  };
 
   useEffect(() => {
     const loadDashboard = async () => {
@@ -73,6 +83,31 @@ export default function DashboardPage() {
     loadDashboard();
   }, [user, tokens, showError]);
 
+  // Show onboarding reminder banner if profile incomplete or user skipped onboarding
+  useEffect(() => {
+    if (!user) return;
+    try {
+      const snoozeKey = `seraaj_onboarding_snooze_until_${user.id}`;
+      const completedKey = `seraaj_onboarding_completed_${user.id}`;
+      const skippedKey = `seraaj_onboarding_skipped_${user.id}`;
+      const snoozeUntilRaw = localStorage.getItem(snoozeKey);
+      const completed = localStorage.getItem(completedKey) === 'true';
+      const skipped = localStorage.getItem(skippedKey) === 'true';
+      const now = Date.now();
+      const snoozeUntil = snoozeUntilRaw ? Number(snoozeUntilRaw) : 0;
+
+      if (snoozeUntil && now < snoozeUntil) {
+        setShowOnboardingReminder(false);
+        return;
+      }
+
+      const needsProfile = isProfileIncomplete(dashboard?.profile);
+      setShowOnboardingReminder(!completed && (skipped || needsProfile));
+    } catch {
+      setShowOnboardingReminder(isProfileIncomplete(dashboard?.profile));
+    }
+  }, [dashboard, user]);
+
   const handleQuickMatch = async () => {
     await loadQuickMatches(8);
   };
@@ -110,6 +145,32 @@ export default function DashboardPage() {
     }
   };
 
+  const handleCompleteApplication = async (applicationId: string) => {
+    if (!user || !tokens?.accessToken) return;
+    try {
+      setCompletingIds((prev) => new Set(prev).add(applicationId));
+      const volunteerApi = createAuthenticatedVolunteerApi(tokens.accessToken);
+      await volunteerApi.completeApplication(applicationId);
+      const dashboardData = await volunteerApi.getVolunteerDashboard(user.id);
+      setDashboard(dashboardData);
+      const totalXP = calculateTotalXP(dashboardData);
+      const level = calculateLevel(totalXP);
+      const nextLevelXP = getXPForNextLevel(level);
+      const impactStats = calculateImpactStats(dashboardData);
+      setGamificationData({ totalXP, level, nextLevelXP, impactStats });
+      setAchievements(generateAchievements(dashboardData));
+    } catch (error) {
+      console.error('Failed to complete application:', error);
+      showError('Failed to mark application as completed.');
+    } finally {
+      setCompletingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(applicationId);
+        return next;
+      });
+    }
+  };
+
   const handleAvatarSave = (newConfig: AvatarConfig) => {
     setAvatarConfig(newConfig);
     // TODO: Save avatar config to user profile/preferences
@@ -122,6 +183,37 @@ export default function DashboardPage() {
         <Header />
         
         <main className="max-w-6xl mx-auto p-6">
+          {showOnboardingReminder && (
+            <div className="mb-6">
+              <PxCard variant="glow">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-pixel text-sunBurst mb-1">Complete Your Profile</h2>
+                    <p className="text-white text-sm">Complete your profile for better matches and faster applications.</p>
+                  </div>
+                  <div className="flex gap-3">
+                    <PxButton variant="primary" onClick={() => window.location.assign('/onboarding')}>
+                      Finish Onboarding
+                    </PxButton>
+                    <PxButton
+                      variant="secondary"
+                      onClick={() => {
+                        try {
+                          if (user?.id) {
+                            const in7days = Date.now() + 7 * 24 * 60 * 60 * 1000;
+                            localStorage.setItem(`seraaj_onboarding_snooze_until_${user.id}`, String(in7days));
+                          }
+                        } catch {}
+                        setShowOnboardingReminder(false);
+                      }}
+                    >
+                      Remind Me Later
+                    </PxButton>
+                  </div>
+                </div>
+              </PxCard>
+            </div>
+          )}
           <div className="mb-8">
             <div className="flex items-center gap-6 mb-4">
               <div>
@@ -164,12 +256,12 @@ export default function DashboardPage() {
           <div className="grid lg:grid-cols-2 gap-6">
             {/* Profile & Applications */}
             <div className="space-y-6">
-              {/* Impact Stats Card */}
+              {/* Hero Stats Card */}
               {gamificationData && !isLoadingDashboard && (
                 <PxCard variant="glow">
                   <div className="flex items-center mb-4">
                     <span className="text-2xl mr-2">📊</span>
-                    <h2 className="text-lg font-pixel text-sunBurst mb-0">IMPACT STATS</h2>
+                    <h2 className="text-lg font-pixel text-sunBurst mb-0">HERO STATS</h2>
                   </div>
                   <div className="grid grid-cols-2 gap-4 text-center">
                     <div>
@@ -195,6 +287,12 @@ export default function DashboardPage() {
                         {gamificationData.impactStats.impactScore}
                       </div>
                       <div className="text-white text-xs font-pixel">IMPACT SCORE</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-pixel text-primary">
+                        {gamificationData.totalXP}
+                      </div>
+                      <div className="text-white text-xs font-pixel">POINTS</div>
                     </div>
                   </div>
                 </PxCard>
@@ -284,6 +382,18 @@ export default function DashboardPage() {
                         >
                           {app.status === 'pending' ? '⏳' : app.status === 'approved' ? '✅' : '❌'} {app.status.toUpperCase()}
                         </PxChip>
+                        {app.status === 'approved' && (
+                          <div className="mt-2">
+                            <PxButton
+                              variant="success"
+                              size="sm"
+                              onClick={() => handleCompleteApplication(app.id)}
+                              disabled={completingIds.has(app.id)}
+                            >
+                              {completingIds.has(app.id) ? 'Completing…' : 'Mark Completed'}
+                            </PxButton>
+                          </div>
+                        )}
                         <p className="text-ink dark:text-white text-xs">
                           📅 Applied: {new Date(app.submittedAt).toLocaleDateString()}
                         </p>

@@ -10,28 +10,50 @@ export interface Achievement {
   requirement?: number;
 }
 
-// XP calculation constants
+// XP/points calculation constants
 const XP_PER_APPLICATION = 50;
 const XP_PER_APPROVED_APPLICATION = 100;
 const XP_PER_COMPLETED_APPLICATION = 200;
 const XP_PER_SKILL = 25;
+const POINTS_PER_COMPLETED_APPLICATION = 100; // fallback points when no explicit profile.points
 
-// Level calculation - exponential growth
+// Level calculation - linear: every 100 points -> next level (Level 1 starts at 0)
 export function calculateLevel(totalXP: number): number {
-  return Math.floor(Math.log2(Math.max(1, totalXP / 100)) + 1);
+  // Treat totalXP as points if provided by backend
+  return Math.max(1, Math.floor(totalXP / 100) + 1);
 }
 
 export function getXPForNextLevel(currentLevel: number): number {
-  return Math.pow(2, currentLevel) * 100;
+  // Next level threshold in points
+  return currentLevel * 100;
 }
 
 // Calculate total XP from dashboard data
 export function calculateTotalXP(dashboard: VolunteerDashboardResponse): number {
+  // Prefer real points from profile if available
+  const p: any = dashboard?.profile as any;
+  if (p && typeof p.points === 'number') {
+    return Math.max(0, p.points);
+  }
+
   let totalXP = 0;
+  const stats = dashboard.applicationStats;
+  let usedApprovedForPoints = false;
 
   // Base XP from profile skills
   if (dashboard.profile?.skills) {
     totalXP += dashboard.profile.skills.length * XP_PER_SKILL;
+  }
+
+  // Add points based on completed/successful applications when explicit points are not present
+  if (stats && typeof stats.approved === 'number') {
+    totalXP += stats.approved * POINTS_PER_COMPLETED_APPLICATION;
+    usedApprovedForPoints = true; // avoid double-rewarding approved apps below
+  } else {
+    const completedApps = typeof p?.completedApplications === 'number' ? p.completedApplications : 0;
+    if (completedApps > 0) {
+      totalXP += completedApps * POINTS_PER_COMPLETED_APPLICATION;
+    }
   }
 
   // XP from applications (including active and past)
@@ -39,7 +61,7 @@ export function calculateTotalXP(dashboard: VolunteerDashboardResponse): number 
     dashboard.activeApplications.forEach(app => {
       totalXP += XP_PER_APPLICATION;
       
-      if (app.status === 'approved') {
+      if (app.status === 'approved' && !usedApprovedForPoints) {
         totalXP += XP_PER_APPROVED_APPLICATION;
       }
       
@@ -158,9 +180,16 @@ export function generateAchievements(dashboard: VolunteerDashboardResponse): Ach
 // Generate impact stats for dashboard
 export function calculateImpactStats(dashboard: VolunteerDashboardResponse) {
   const applications = dashboard.activeApplications || [];
-  const totalApplications = (dashboard.profile?.completedApplications || 0) + applications.length;
-  const approvedApplications = applications.filter(app => app.status === 'approved').length;
-  const pendingApplications = applications.filter(app => app.status === 'pending').length;
+  const stats = dashboard.applicationStats;
+  const totalApplications = (typeof stats?.totalApplications === 'number')
+    ? stats.totalApplications
+    : (dashboard.profile?.completedApplications || 0) + applications.length;
+  const approvedApplications = (typeof stats?.approved === 'number')
+    ? stats.approved
+    : applications.filter(app => app.status === 'approved').length;
+  const pendingApplications = (typeof stats?.pending === 'number')
+    ? stats.pending
+    : applications.filter(app => app.status === 'pending').length;
   
   // Estimate impact based on applications
   const estimatedHoursPerApplication = 20; // Average volunteer hours per opportunity

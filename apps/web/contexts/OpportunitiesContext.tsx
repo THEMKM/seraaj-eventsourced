@@ -56,7 +56,7 @@ export function OpportunitiesProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
   const { user } = useAuth();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess, showError, showInfo } = useToast();
 
   const loadQuickMatches = useCallback(async (limit = 10) => {
     try {
@@ -71,14 +71,20 @@ export function OpportunitiesProvider({ children }: { children: ReactNode }) {
       }) as unknown as any[];
       
       setOpportunities(rawMatches || []);
-      showSuccess(`Found ${rawMatches?.length || 0} quest matches for you! 🎆`);
+      showSuccess(`Found ${rawMatches?.length || 0} quest matches for you!`);
     } catch (error) {
       console.error('Failed to load opportunities:', error);
-      showError('Failed to load opportunities');
+      const err: any = error as any;
+      if (err?.status === 404) {
+        setOpportunities([]);
+        showInfo('No opportunities match your profile yet. Try updating your preferences or check back later.');
+      } else {
+        showError('Failed to load opportunities');
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [user, showSuccess, showError]);
+  }, [user, showSuccess, showError, showInfo]);
 
   const loadOpportunityDetails = useCallback(async (opportunityId: string) => {
     try {
@@ -119,7 +125,7 @@ export function OpportunitiesProvider({ children }: { children: ReactNode }) {
         coverLetter: coverLetter || 'I am interested in this opportunity and would like to help!'
       });
       
-      showSuccess('Quest application submitted successfully! 🎆 The organization will review your heroic credentials.');
+      showSuccess('Quest application submitted successfully! dYZ+ The organization will review your heroic credentials.');
       
       // Remove the opportunity from the list (already applied) - use opportunityId
       setOpportunities(prev => prev.filter(opp => opp.opportunityId !== opportunityId));
@@ -159,3 +165,4 @@ export function useOpportunities() {
   }
   return context;
 }
+

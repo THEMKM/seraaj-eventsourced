@@ -1,15 +1,19 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useOpportunities } from '@/contexts/OpportunitiesContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { SearchProvider, useSearch } from '@/contexts/SearchContext';
+import { FilterPanel } from '@/components/search/FilterPanel';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Header } from '@/components/navigation/Header';
 import { PxButton, PxCard, PxLoading, PxModal, PxBadge } from '@seraaj/ui';
 import { useState } from 'react';
 
-export default function OpportunitiesPage() {
+// Create a content component that uses the search context
+const OpportunitiesContent = () => {
   const { user } = useAuth();
+  const { filters } = useSearch();
   const { 
     opportunities, 
     isLoading, 
@@ -20,9 +24,50 @@ export default function OpportunitiesPage() {
   const [selectedOpportunityId, setSelectedOpportunityId] = useState<string | null>(null);
   const [applicationMessage, setApplicationMessage] = useState('');
 
+  // Filter opportunities based on selected filters
+  const filteredOpportunities = useMemo(() => {
+    return opportunities.filter(opportunity => {
+      // Location filter
+      if (filters.location && filters.location !== 'Remote') {
+        // Simple string match - in real implementation, this would be more sophisticated
+        const hasLocation = opportunity.organizationName?.toLowerCase().includes(filters.location.toLowerCase()) ||
+                           opportunity.opportunityTitle?.toLowerCase().includes(filters.location.toLowerCase());
+        if (!hasLocation) return false;
+      }
+
+      // Causes filter (simplified - assumes opportunity has causes data)
+      if (filters.causes.length > 0) {
+        // For now, we'll do a simple text search in title/description
+        const opportunityText = `${opportunity.opportunityTitle} ${opportunity.organizationName}`.toLowerCase();
+        const hasCause = filters.causes.some(cause => 
+          opportunityText.includes(cause.toLowerCase())
+        );
+        if (!hasCause) return false;
+      }
+
+      // Time commitment filter (simplified)
+      if (filters.timeCommitment.length > 0) {
+        // Simple text search for now
+        const opportunityText = `${opportunity.opportunityTitle}`.toLowerCase();
+        const hasTimeMatch = filters.timeCommitment.some(time => {
+          if (time.includes('1-2') && (opportunityText.includes('part') || opportunityText.includes('minimal'))) return true;
+          if (time.includes('3-5') && opportunityText.includes('moderate')) return true;
+          if (time.includes('flexible') && opportunityText.includes('flexible')) return true;
+          if (time.includes('one-time') && opportunityText.includes('event')) return true;
+          return false;
+        });
+        if (!hasTimeMatch) return false;
+      }
+
+      return true;
+    });
+  }, [opportunities, filters]);
+
+  const didInitRef = useRef(false);
   useEffect(() => {
-    // Load opportunities when component mounts
-    loadQuickMatches(10);
+    if (didInitRef.current) return;
+    didInitRef.current = true;
+    loadQuickMatches(20);
   }, [loadQuickMatches]);
 
   const handleApply = (opportunityId: string) => {
@@ -53,7 +98,7 @@ export default function OpportunitiesPage() {
   };
 
   return (
-    <ProtectedRoute>
+    <>
       <div className="min-h-screen bg-gradient-to-br from-deepIndigo to-ink">
         <Header />
         
@@ -69,7 +114,7 @@ export default function OpportunitiesPage() {
             <div className="flex space-x-4">
               <PxButton 
                 variant="primary" 
-                onClick={() => loadQuickMatches(10)}
+                onClick={() => loadQuickMatches(20)}
                 disabled={isLoading}
               >
                 {isLoading ? '⏳ SCANNING...' : '🔄 REFRESH QUESTS'}
@@ -77,7 +122,7 @@ export default function OpportunitiesPage() {
               
               <PxButton 
                 variant="secondary" 
-                onClick={() => loadQuickMatches(10)}
+                onClick={() => loadQuickMatches(20)}
                 disabled={isLoading}
               >
                 🌌 SHOW MORE
@@ -85,13 +130,26 @@ export default function OpportunitiesPage() {
             </div>
           </div>
 
+          {/* Filter Panel */}
+          <FilterPanel />
+
           {isLoading && opportunities.length === 0 ? (
             <div className="flex justify-center py-12">
               <PxLoading size="lg" variant="bright" text="Finding perfect quests for you..." />
             </div>
           ) : (
             <>
-              {opportunities.length === 0 ? (
+              {filteredOpportunities.length === 0 && opportunities.length > 0 ? (
+                <PxCard variant="default" className="text-center py-12">
+                  <div className="text-6xl mb-4">🤷‍♂️</div>
+                  <h3 className="text-lg font-pixel text-primary mb-2">
+                    NO QUESTS MATCH YOUR FILTERS
+                  </h3>
+                  <p className="text-white text-sm mb-4">
+                    Try adjusting your filters or clearing them to see more opportunities.
+                  </p>
+                </PxCard>
+              ) : opportunities.length === 0 ? (
                 <PxCard variant="default" className="text-center py-12">
                   <div className="text-6xl mb-4">🔍</div>
                   <h3 className="text-lg font-pixel text-primary mb-2">
@@ -108,12 +166,12 @@ export default function OpportunitiesPage() {
                 <>
                   <div className="mb-4">
                     <PxBadge variant="info" size="md">
-                      🎯 Found {opportunities.length} matching quests
+                      🎯 Found {filteredOpportunities.length} matching quests
                     </PxBadge>
                   </div>
                   
                   <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {opportunities.map((match) => {
+                    {filteredOpportunities.map((match) => {
                       const matchScore = Math.round(match.score * 100);
                       return (
                         <PxCard key={match.id} variant="default" className="h-full">
@@ -122,7 +180,7 @@ export default function OpportunitiesPage() {
                             <div className="space-y-2">
                               <div className="flex items-start justify-between">
                                 <h3 className="text-ink dark:text-white font-pixel text-sm leading-tight">
-                                  🏆 {match.opportunityTitle || `QUEST ${match.opportunityId.toUpperCase()}`}
+                                  🏆 {match.opportunityTitle || `QUEST ${match.opportunityId?.toUpperCase() || 'UNKNOWN'}`}
                                 </h3>
                                 <PxBadge 
                                   variant={getMatchBadgeVariant(matchScore)} 
@@ -134,7 +192,7 @@ export default function OpportunitiesPage() {
                               </div>
                               
                               <p className="text-ink dark:text-white text-xs">
-                                🏰 {match.organizationName || match.organizationId.toUpperCase()}
+                                🏰 {match.organizationName || match.organizationId?.toUpperCase() || 'UNKNOWN ORG'}
                               </p>
                               
                               <p className="text-electric-teal text-xs font-pixel">
@@ -257,6 +315,17 @@ export default function OpportunitiesPage() {
           </div>
         </PxModal>
       </div>
+    </>
+  );
+};
+
+// Main component with search provider
+export default function OpportunitiesPage() {
+  return (
+    <ProtectedRoute>
+      <SearchProvider>
+        <OpportunitiesContent />
+      </SearchProvider>
     </ProtectedRoute>
   );
 }

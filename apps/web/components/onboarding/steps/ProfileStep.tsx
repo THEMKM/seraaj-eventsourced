@@ -4,6 +4,35 @@ import React from 'react';
 import { PxInput } from '@/components/forms/PxInput';
 import { OnboardingData } from '../OnboardingFlow';
 
+const ORGANIZATION_TYPES = [
+  { value: 'nonprofit', label: 'Non-profit' },
+  { value: 'charity', label: 'Charity' },
+  { value: 'ngo', label: 'NGO' },
+  { value: 'social-enterprise', label: 'Social Enterprise' },
+  { value: 'community-group', label: 'Community Group' },
+];
+
+const ORGANIZATION_SIZES = [
+  { value: '1-5', label: '1-5 people' },
+  { value: '6-20', label: '6-20 people' },
+  { value: '21-50', label: '21-50 people' },
+  { value: '50+', label: '50+ people' },
+];
+
+const LOCATIONS = [
+  'Amman, Jordan',
+  'Beirut, Lebanon', 
+  'Cairo, Egypt',
+  'Dubai, UAE',
+  'Riyadh, Saudi Arabia',
+  'Baghdad, Iraq',
+  'Kuwait City, Kuwait',
+  'Doha, Qatar',
+  'Manama, Bahrain',
+  'Muscat, Oman',
+  'Other'
+];
+
 export const ProfileStep: React.FC<{
   data: OnboardingData;
   updateData: (u: Partial<OnboardingData>) => void;
@@ -13,7 +42,9 @@ export const ProfileStep: React.FC<{
     <div className="space-y-6">
       <div className="text-center">
         <p className="text-white text-sm">
-          {data.userType === 'organization' ? 'Tell us about your organization.' : 'Tell us a bit about yourself.'}
+          {data.userType === 'organization' 
+            ? 'Tell us about your quest-giving organization.' 
+            : 'Tell us about yourself, brave hero.'}
         </p>
       </div>
 
@@ -28,11 +59,49 @@ export const ProfileStep: React.FC<{
         {data.userType === 'organization' && (
           <>
             <PxInput label="Organization Name" value={data.organizationName || ''} onChange={(e) => updateData({ organizationName: e.target.value })} required />
-            <PxInput label="Organization Type" value={data.organizationType || ''} onChange={(e) => updateData({ organizationType: e.target.value })} />
+            <div>
+              <label className="block text-sm font-pixel text-white mb-2">Organization Type</label>
+              <select
+                value={data.organizationType || ''}
+                onChange={(e) => updateData({ organizationType: e.target.value })}
+                className="w-full clip-px border-px border-electric-teal bg-dark-surface/20 text-white font-body text-sm p-3"
+              >
+                <option value="">Select type...</option>
+                {ORGANIZATION_TYPES.map(type => (
+                  <option key={type.value} value={type.value}>{type.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-pixel text-white mb-2">Organization Size</label>
+              <select
+                value={data.organizationSize || ''}
+                onChange={(e) => updateData({ organizationSize: e.target.value })}
+                className="w-full clip-px border-px border-electric-teal bg-dark-surface/20 text-white font-body text-sm p-3"
+              >
+                <option value="">Select size...</option>
+                {ORGANIZATION_SIZES.map(size => (
+                  <option key={size.value} value={size.value}>{size.label}</option>
+                ))}
+              </select>
+            </div>
           </>
         )}
 
-        <PxInput label="Location" value={data.location} onChange={(e) => updateData({ location: e.target.value })} placeholder="e.g., Cairo, Egypt" required />
+        <div>
+          <label className="block text-sm font-pixel text-white mb-2">Location *</label>
+          <select
+            value={data.location}
+            onChange={(e) => updateData({ location: e.target.value })}
+            className="w-full clip-px border-px border-electric-teal bg-dark-surface/20 text-white font-body text-sm p-3"
+            required
+          >
+            <option value="">Select location...</option>
+            {LOCATIONS.map(location => (
+              <option key={location} value={location}>{location}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div>

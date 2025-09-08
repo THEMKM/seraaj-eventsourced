@@ -13,6 +13,7 @@ interface AuthContextType {
   register: (name: string, email: string, password: string, role: UserRole.VOLUNTEER | UserRole.ORG_ADMIN) => Promise<void>;
   logout: () => void;
   refreshAuth: () => Promise<void>;
+  reloadUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -206,6 +207,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const reloadUser = async (): Promise<void> => {
+    try {
+      const currentUser = await authenticatedAuthApi.getCurrentUser();
+      setUser(currentUser);
+    } catch (error) {
+      // If this fails, keep existing user; caller may handle
+      console.error('Failed to reload user profile:', error);
+    }
+  };
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -215,7 +226,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       register,
       logout,
-      refreshAuth
+      refreshAuth,
+      reloadUser
     }}>
       {children}
     </AuthContext.Provider>

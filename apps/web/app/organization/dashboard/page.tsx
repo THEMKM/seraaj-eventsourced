@@ -55,16 +55,8 @@ export default function OrganizationDashboardPage() {
         setIsLoading(true);
         
         // Load organization applications and stats
-        const tokensRaw = localStorage.getItem('seraaj_tokens');
-        const accessToken = tokensRaw ? JSON.parse(tokensRaw).accessToken : undefined;
-        const response = await fetch(`${process.env.NEXT_PUBLIC_BFF_URL || 'http://localhost:8000/api'}/organization/${user.id}/dashboard`, {
-          headers: {
-            'Authorization': accessToken ? `Bearer ${accessToken}` : ''
-          }
-        });
-
-        if (response.ok) {
-          const data = await response.json();
+        const { data, success, message } = await bffClient.get<any>(`/organization/${user.id}/dashboard`);
+        if (success && data) {
           console.log('Organization dashboard data:', data);
           
           // Map application stats to UI format
@@ -87,17 +79,10 @@ export default function OrganizationDashboardPage() {
           
           setApplications(mockApplications);
           
-          // Fetch opportunities data from opportunities service
+          // Fetch opportunities data via BFF SDK
           try {
-            const opportunitiesResponse = await fetch(`${process.env.NEXT_PUBLIC_BFF_URL || 'http://localhost:8000/api'}/opportunities/organization/${user.id}`, {
-              headers: {
-                'Authorization': accessToken ? `Bearer ${accessToken}` : ''
-              }
-            });
-            
-            if (opportunitiesResponse.ok) {
-              const opportunitiesData = await opportunitiesResponse.json();
-              
+            const { data: opportunitiesData, success: okOpp } = await bffClient.get<any[]>(`/opportunities/organization/${user.id}`);
+            if (okOpp && Array.isArray(opportunitiesData)) {
               const mappedOpportunities: OpportunityStats[] = opportunitiesData.map((opp: any) => ({
                 id: opp.id,
                 title: opp.title,
@@ -105,13 +90,14 @@ export default function OrganizationDashboardPage() {
                 activeVolunteers: opp.current_volunteers || 0,
                 status: opp.status === 'active' ? 'active' : opp.status === 'filled' ? 'filled' : 'closed'
               }));
-              
               setOpportunities(mappedOpportunities);
             }
           } catch (oppError) {
             console.error('Failed to load opportunities:', oppError);
             setOpportunities([]); // Fallback to empty array
           }
+        } else {
+          throw new Error(message || 'Failed to load organization dashboard');
         }
       } catch (error) {
         console.error('Failed to load dashboard:', error);
@@ -128,11 +114,14 @@ export default function OrganizationDashboardPage() {
     if (!selectedApplication || !reviewAction) return;
 
     try {
-      const response = await fetch(`/api/applications/${selectedApplication.id}/review`, {
+      const tokensRaw = localStorage.getItem('seraaj_tokens');
+      const accessToken = tokensRaw ? JSON.parse(tokensRaw).accessToken : undefined;
+      const bffBase = process.env.NEXT_PUBLIC_BFF_URL || 'http://localhost:8000/api';
+      const response = await fetch(`${bffBase}/applications/${selectedApplication.id}/review`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+          'Authorization': accessToken ? `Bearer ${accessToken}` : ''
         },
         body: JSON.stringify({
           decision: reviewAction,

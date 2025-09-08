@@ -2,63 +2,72 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/contexts/ToastContext';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { Header } from '@/components/navigation/Header';
-import { PxButton, PxCard, PxChip } from '@seraaj/ui';
-import { PxInput } from '@/components/forms/PxInput';
-import { UserRole, VolunteerDashboardResponse } from '@seraaj/sdk-bff';
-import { AvatarDisplay, AvatarSelector } from '@/components/avatar/AvatarSelector';
-import { AvatarConfig, AvatarClass, AvatarPose, calculateAvatarClass, getUnlockedAccessories } from '@/components/avatar/AvatarSystem';
-import { Achievement, generateAchievements, calculateImpactStats, calculateImpactLevel } from '@/utils/gamification';
-import { createAuthenticatedVolunteerApi } from '@/lib/bff';
-
-export default function ProfilePage() {
-  const { user, tokens } = useAuth();
-  const { showSuccess, showError } = useToast();
-  const [isEditing, setIsEditing] = useState(false);
-  const [editName, setEditName] = useState(user?.name || '');
-  const [editEmail, setEditEmail] = useState(user?.email || '');
-  const [isSaving, setIsSaving] = useState(false);
-  const [avatarConfig, setAvatarConfig] = useState<AvatarConfig | null>(null);
-  const [achievements, setAchievements] = useState<Achievement[]>([]);
-  const [userLevel, setUserLevel] = useState(1);
-  const [isAvatarSelectorOpen, setIsAvatarSelectorOpen] = useState(false);
-  const [impactStats, setImpactStats] = useState<{
-    estimatedVolunteerHours: number;
-    totalApplications: number;
-    organizationsHelped: number;
-    impactScore: number;
-    impactLevel: string;
-  } | null>(null);
-  const [dashboardData, setDashboardData] = useState<VolunteerDashboardResponse | null>(null);
-
-  useEffect(() => {
-    const loadProfileData = async () => {
-      if (!user || !tokens?.accessToken) return;
-
-      try {
-        const volunteerApi = createAuthenticatedVolunteerApi(tokens.accessToken);
-        const fetchedDashboardData = await volunteerApi.getVolunteerDashboard(user.id);
-        setDashboardData(fetchedDashboardData);
-        
-        // Generate achievements and calculate level
-        const generatedAchievements = generateAchievements(fetchedDashboardData);
-        setAchievements(generatedAchievements);
-        
-        // Calculate impact stats with real data
-        const calculatedImpactStats = calculateImpactStats(fetchedDashboardData);
-        const impactLevel = calculateImpactLevel(calculatedImpactStats.impactScore, calculatedImpactStats.totalApplications);
-        setImpactStats({
-          ...calculatedImpactStats,
-          impactLevel
-        });
-        
-        // Simple level calculation based on applications
-        const totalApps = calculatedImpactStats.totalApplications;
-        const level = Math.max(1, Math.floor(totalApps / 3) + 1);
-        setUserLevel(level);
-        
+              <PxInput
+                label="Hero Name"
+                type="text"
+                value={isEditing ? editName : (user?.name || '')}
+                onChange={isEditing ? (e) => setEditName(e.target.value) : undefined}
+                placeholder="Enter your hero name"
+                readOnly={!isEditing}
+              />
+              <PxInput
+                label="Email Contact"
+                type="email"
+                value={isEditing ? editEmail : (user?.email || '')}
+                onChange={isEditing ? (e) => setEditEmail(e.target.value) : undefined}
+                placeholder="hero@example.com"
+                readOnly={!isEditing}
+              />
+              <PxInput
+                label="Location"
+                type="text"
+                value={isEditing ? editLocation : ((dashboardData?.profile as any)?.location || '')}
+                onChange={isEditing ? (e) => setEditLocation(e.target.value) : undefined}
+                placeholder="City, Country"
+                readOnly={!isEditing}
+              />
+              <div className="space-y-1">
+                <label className="text-sm font-pixel text-ink dark:text-white">Bio</label>
+                <textarea
+                  className="w-full bg-transparent border border-electric-teal text-white p-2"
+                  rows={3}
+                  value={isEditing ? editBio : ((dashboardData?.profile as any)?.bio || '')}
+                  onChange={isEditing ? (e) => setEditBio(e.target.value) : undefined}
+                  placeholder="Tell us about yourself"
+                  readOnly={!isEditing}
+                />
+              </div>
+              <PxInput
+                label="Skills (comma separated)"
+                type="text"
+                value={isEditing ? editSkillsText : (((dashboardData?.profile as any)?.skills || []).join(', '))}
+                onChange={isEditing ? (e) => setEditSkillsText(e.target.value) : undefined}
+                placeholder="e.g., teaching, first aid, Python"
+                readOnly={!isEditing}
+              />
+              <PxInput
+                label="Interests (comma separated)"
+                type="text"
+                value={isEditing ? editInterestsText : (((dashboardData?.profile as any)?.interests || []).join(', '))}
+                onChange={isEditing ? (e) => setEditInterestsText(e.target.value) : undefined}
+                placeholder="e.g., Education, Health, Environment"
+                readOnly={!isEditing}
+              />
+              <div className="space-y-1">
+                <label className="text-sm font-pixel text-ink dark:text-white">Availability (hrs/week)</label>
+                <select
+                  className="w-full bg-transparent border border-electric-teal text-white p-2"
+                  value={editAvailability}
+                  onChange={isEditing ? (e) => setEditAvailability(e.target.value) : undefined}
+                  disabled={!isEditing}
+                >
+                  <option value="">Select availability...</option>
+                  <option value="1-2">1-2</option>
+                  <option value="3-5">3-5</option>
+                  <option value="6-10">6-10</option>
+                  <option value="10+">10+</option>
+                </select>
+              </div>
         // Initialize avatar configuration
         const avatarClass = calculateAvatarClass(level, generatedAchievements);
         const unlockedAccessories = getUnlockedAccessories(generatedAchievements, level);
@@ -87,6 +96,22 @@ export default function ProfilePage() {
     setIsEditing(false);
     setEditName(user?.name || '');
     setEditEmail(user?.email || '');
+    const p: any = dashboardData?.profile || {};
+    setEditLocation(p?.location || '');
+    setEditBio(p?.bio || '');
+    setEditSkillsText(Array.isArray(p?.skills) ? p.skills.join(', ') : '');
+    setEditInterestsText(Array.isArray(p?.interests) ? p.interests.join(', ') : '');
+    const avail = p?.availability as any;
+    if (avail) {
+      const a = avail as { weekdays?: boolean; weekends?: boolean; evenings?: boolean };
+      if (a.weekdays && a.weekends && a.evenings) setEditAvailability('10+');
+      else if (a.weekdays) setEditAvailability('6-10');
+      else if (a.evenings && a.weekends) setEditAvailability('3-5');
+      else if (a.evenings) setEditAvailability('1-2');
+      else setEditAvailability('');
+    } else {
+      setEditAvailability('');
+    }
   };
 
   const handleSaveProfile = async () => {
@@ -108,20 +133,71 @@ export default function ProfilePage() {
       }
 
       const api = createAuthenticatedVolunteerApi(tokens.accessToken);
+      // Map availability selection to backend flags (aligned with onboarding)
+      const mapAvailability = (value: string | undefined) => {
+        if (!value) return undefined;
+        switch (value) {
+          case '1-2':
+            return { evenings: true };
+          case '3-5':
+            return { evenings: true, weekends: true };
+          case '6-10':
+            return { weekdays: true };
+          case '10+':
+            return { weekdays: true, weekends: true, evenings: true };
+          default:
+            return undefined;
+        }
+      };
+
+      const skills = editSkillsText.split(',').map(s => s.trim()).filter(Boolean);
+      const interests = editInterestsText.split(',').map(s => s.trim()).filter(Boolean);
+
       await api.updateVolunteerProfile(user.id, {
         name: editName.trim(),
         email: editEmail.trim(),
+        location: editLocation.trim() || undefined,
+        bio: editBio.trim() || undefined,
+        skills: skills.length ? skills : undefined,
+        interests: interests.length ? interests : undefined,
+        availability: mapAvailability(editAvailability),
       });
-      showSuccess('Profile updated successfully! 🎆 Your heroic data has been saved.');
+      showSuccess('Profile updated successfully!');
       setIsEditing(false);
       
-      // TODO: Refresh user data in context to reflect changes
+      // Refresh user data in context to reflect changes
+      await reloadUser();
       
     } catch (error) {
       console.error('Failed to save profile:', error);
       showError(error instanceof Error ? error.message : 'Failed to save profile changes');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Background completion state for UI feedback
+  const [completingIds, setCompletingIds] = useState<Set<string>>(new Set());
+
+  const handleCompleteApplication = async (applicationId: string) => {
+    if (!user || !tokens?.accessToken) return;
+    try {
+      setCompletingIds((prev) => new Set(prev).add(applicationId));
+      const volunteerApi = createAuthenticatedVolunteerApi(tokens.accessToken);
+      await volunteerApi.completeApplication(applicationId);
+      // Reload dashboard/profile data
+      const fetchedDashboardData = await volunteerApi.getVolunteerDashboard(user.id);
+      setDashboardData(fetchedDashboardData);
+      // Optionally recalc achievements/level here if you show them in profile widgets
+    } catch (error) {
+      console.error('Failed to complete application:', error);
+      showError('Failed to mark application as completed.');
+    } finally {
+      setCompletingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(applicationId);
+        return next;
+      });
     }
   };
 
@@ -142,7 +218,7 @@ export default function ProfilePage() {
             👤 HERO PROFILE 👤
           </h1>
           <p className="text-white text-lg">
-            Manage your hero stats and quest preferences
+            Manage your personal info and settings
           </p>
         </div>
 
@@ -201,12 +277,63 @@ export default function ProfilePage() {
                 readOnly={!isEditing}
               />
               <PxInput
-                label="✉️ EMAIL CONTACT"
+                label="Email Contact"
                 type="email"
                 value={isEditing ? editEmail : (user?.email || '')}
                 onChange={isEditing ? (e) => setEditEmail(e.target.value) : undefined}
                 placeholder="hero@example.com"
                 readOnly={!isEditing}
+
+              <PxInput
+                label="Location"
+                type="text"
+                value={isEditing ? editLocation : ((dashboardData?.profile as any)?.location || '')}
+                onChange={isEditing ? (e) => setEditLocation(e.target.value) : undefined}
+                placeholder="City, Country"
+                readOnly={!isEditing}
+              />
+              <div className="space-y-1">
+                <label className="text-sm font-pixel text-ink dark:text-white">Bio</label>
+                <textarea
+                  className="w-full bg-transparent border border-electric-teal text-white p-2"
+                  rows={3}
+                  value={isEditing ? editBio : ((dashboardData?.profile as any)?.bio || '')}
+                  onChange={isEditing ? (e) => setEditBio(e.target.value) : undefined}
+                  placeholder="Tell us about yourself"
+                  readOnly={!isEditing}
+                />
+              </div>
+              <PxInput
+                label="Skills (comma separated)"
+                type="text"
+                value={isEditing ? editSkillsText : (((dashboardData?.profile as any)?.skills || []).join(', '))}
+                onChange={isEditing ? (e) => setEditSkillsText(e.target.value) : undefined}
+                placeholder="e.g., teaching, first aid, Python"
+                readOnly={!isEditing}
+              />
+              <PxInput
+                label="Interests (comma separated)"
+                type="text"
+                value={isEditing ? editInterestsText : (((dashboardData?.profile as any)?.interests || []).join(', '))}
+                onChange={isEditing ? (e) => setEditInterestsText(e.target.value) : undefined}
+                placeholder="e.g., Education, Health, Environment"
+                readOnly={!isEditing}
+              />
+              <div className="space-y-1">
+                <label className="text-sm font-pixel text-ink dark:text-white">Availability (hrs/week)</label>
+                <select
+                  className="w-full bg-transparent border border-electric-teal text-white p-2"
+                  value={editAvailability}
+                  onChange={isEditing ? (e) => setEditAvailability(e.target.value) : undefined}
+                  disabled={!isEditing}
+                >
+                  <option value="">Select availability...</option>
+                  <option value="1-2">1-2</option>
+                  <option value="3-5">3-5</option>
+                  <option value="6-10">6-10</option>
+                  <option value="10+">10+</option>
+                </select>
+              </div>
               />
               <div>
                 <p className="text-sm font-pixel text-ink dark:text-white mb-2">🎖️ CLASS:</p>
@@ -220,27 +347,25 @@ export default function ProfilePage() {
                   <PxButton 
                     variant="success" 
                     onClick={handleSaveProfile}
-                    disabled={isSaving}
                   >
-                    {isSaving ? '⏳ SAVING...' : '💾 SAVE CHANGES'}
+                    {isSaving ? 'Saving...' : 'Save Changes'}
                   </PxButton>
                   <PxButton 
                     variant="secondary" 
                     onClick={handleCancelEdit}
                     disabled={isSaving}
                   >
-                    ❌ CANCEL
+                    Cancel
                   </PxButton>
-                </div>
               ) : (
                 <PxButton variant="primary" onClick={handleEditClick}>
-                  ✏️ EDIT PROFILE
+                  Edit Profile
                 </PxButton>
               )}
             </div>
           </PxCard>
 
-          <PxCard variant="glow" className="col-span-full md:col-span-1">
+          <PxCard variant="glow" className="hidden col-span-full md:col-span-1">
             <div className="flex items-center mb-4">
               <span className="text-3xl mr-3">📈</span>
               <h2 className="text-xl font-pixel text-sunBurst mb-0">HERO STATS</h2>
@@ -299,7 +424,7 @@ export default function ProfilePage() {
             </div>
           </PxCard>
 
-          <PxCard variant="default" className="col-span-full">
+          <PxCard variant="default" className="hidden col-span-full">
             <div className="flex items-center mb-4">
               <span className="text-2xl mr-2">📅</span>
               <h2 className="text-xl font-pixel text-primary mb-0">
@@ -341,6 +466,18 @@ export default function ProfilePage() {
                         <p className="text-xs text-ink dark:text-gray-300 ml-6">
                           🎯 Opportunity ID: {application.opportunityId} • {statusConfig.timeText}
                         </p>
+                        {application.status === 'approved' && (
+                          <div className="mt-2 ml-6">
+                            <PxButton
+                              variant="success"
+                              size="sm"
+                              onClick={() => handleCompleteApplication(application.id)}
+                              disabled={completingIds.has(application.id)}
+                            >
+                              {completingIds.has(application.id) ? 'Completing…' : 'Mark Completed'}
+                            </PxButton>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -409,3 +546,10 @@ export default function ProfilePage() {
     </ProtectedRoute>
   );
 }
+
+
+
+
+
+
+

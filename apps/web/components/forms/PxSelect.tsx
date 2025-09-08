@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useId } from 'react';
 import { clsx } from 'clsx';
 
 export interface PxSelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'size'> {
@@ -16,19 +16,23 @@ export const PxSelect = forwardRef<HTMLSelectElement, PxSelectProps>(function Px
   size = 'md',
   options,
   className,
+  id,
   ...props
 }, ref) {
   const hasError = error || variant === 'error';
+  const autoId = useId();
+  const selectId = id || autoId;
   
   return (
     <div className="space-y-1">
       {label && (
-        <label className="block text-xs font-pixel text-sunBurst">
+        <label htmlFor={selectId} className="block text-xs font-pixel text-sunBurst">
           {label}
         </label>
       )}
       <select
         ref={ref}
+        id={selectId}
         className={clsx(
           'w-full border-2 bg-deepIndigo text-white font-pixel text-xs',
           'focus:outline-none focus:ring-2 focus:ring-offset-2',

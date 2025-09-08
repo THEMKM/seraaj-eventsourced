@@ -18,6 +18,19 @@ const SKILLS = [
   'Translation', 'Data Analysis', 'Research', 'Healthcare', 'Counseling'
 ];
 
+const INTERESTS = [
+  'Direct Service', 'Advocacy', 'Research', 'Capacity Building',
+  'Emergency Response', 'Policy Work', 'Creative Projects',
+  'Technology Solutions', 'Community Outreach', 'Training & Workshops'
+];
+
+const AVAILABILITY_OPTIONS = [
+  { value: '1-2', label: '1-2 hours/week (Minimal)' },
+  { value: '3-5', label: '3-5 hours/week (Moderate)' },
+  { value: '6-10', label: '6-10 hours/week (Significant)' },
+  { value: '10+', label: '10+ hours/week (Extensive)' },
+];
+
 export const PreferencesStep: React.FC<{
   data: OnboardingData;
   updateData: (u: Partial<OnboardingData>) => void;
@@ -60,26 +73,28 @@ export const PreferencesStep: React.FC<{
           </div>
 
           <div>
-            <h3 className="text-white font-pixel text-sm mb-2">Availability *</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-              <div
-                className={`clip-px border-px p-3 cursor-pointer ${data.availability.weekdays ? 'border-success bg-success/10' : 'border-electric-teal bg-dark-surface/20'}`}
-                onClick={() => updateData({ availability: { ...data.availability, weekdays: !data.availability.weekdays } })}
-              >
-                <p className="text-white text-xs font-pixel">Weekdays</p>
-              </div>
-              <div
-                className={`clip-px border-px p-3 cursor-pointer ${data.availability.weekends ? 'border-success bg-success/10' : 'border-electric-teal bg-dark-surface/20'}`}
-                onClick={() => updateData({ availability: { ...data.availability, weekends: !data.availability.weekends } })}
-              >
-                <p className="text-white text-xs font-pixel">Weekends</p>
-              </div>
-              <div
-                className={`clip-px border-px p-3 cursor-pointer ${data.availability.evenings ? 'border-success bg-success/10' : 'border-electric-teal bg-dark-surface/20'}`}
-                onClick={() => updateData({ availability: { ...data.availability, evenings: !data.availability.evenings } })}
-              >
-                <p className="text-white text-xs font-pixel">Evenings</p>
-              </div>
+            <h3 className="text-white font-pixel text-sm mb-2">Interests</h3>
+            <div className="flex flex-wrap gap-2">
+              {INTERESTS.map(i => (
+                <PxChip key={i} variant={data.interests.includes(i) ? 'selected' : 'default'} onClick={() => updateData({ interests: toggle(data.interests, i) })}>
+                  {i}
+                </PxChip>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-white font-pixel text-sm mb-2">Time Commitment *</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {AVAILABILITY_OPTIONS.map(option => (
+                <div
+                  key={option.value}
+                  className={`clip-px border-px p-3 cursor-pointer ${data.availability === option.value ? 'border-success bg-success/10' : 'border-electric-teal bg-dark-surface/20'}`}
+                  onClick={() => updateData({ availability: option.value })}
+                >
+                  <p className="text-white text-xs font-pixel">{option.label}</p>
+                </div>
+              ))}
             </div>
           </div>
         </>

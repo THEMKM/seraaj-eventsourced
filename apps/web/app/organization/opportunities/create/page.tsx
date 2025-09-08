@@ -126,8 +126,9 @@ export default function CreateOpportunityPage() {
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
-      // For now, use the stub opportunities service
-      const response = await fetch('http://localhost:8002/api/opportunities', {
+      // Submit via BFF -> Opportunities service
+      const bffBase = process.env.NEXT_PUBLIC_BFF_URL || 'http://localhost:8000/api';
+      const response = await fetch(`${bffBase}/opportunities`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -137,17 +138,24 @@ export default function CreateOpportunityPage() {
           organization_id: user?.id,
           title: oppData.title,
           description: oppData.description,
+          category: oppData.category || null,
+          location: oppData.isRemote ? 'Remote' : oppData.location,
+          is_remote: !!oppData.isRemote,
           skills_required: oppData.skillsRequired,
-          location: oppData.location,
+          time_commitment: oppData.timeCommitment || null,
           start_date: oppData.startDate,
           end_date: oppData.endDate || null,
-          max_volunteers: oppData.maxVolunteers
+          max_volunteers: oppData.maxVolunteers,
+          application_deadline: oppData.applicationDeadline || null,
+          contact_email: oppData.contactEmail,
+          requirements: oppData.requirements || null,
+          benefits: oppData.benefits || null
         })
       });
 
       if (response.ok) {
         showSuccess('🎆 Quest posted successfully! Heroes can now apply!');
-        router.push('/organization/dashboard');
+        router.push('/organization/opportunities');
       } else {
         throw new Error('Failed to create opportunity');
       }

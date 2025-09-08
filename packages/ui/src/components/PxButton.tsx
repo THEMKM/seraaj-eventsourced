@@ -7,6 +7,8 @@ export interface PxButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButto
   children: React.ReactNode;
   onClick?: () => void;
   disabled?: boolean;
+  loading?: boolean;
+  fullWidth?: boolean;
   className?: string;
 }
 
@@ -16,13 +18,15 @@ export function PxButton({
   children,
   onClick,
   disabled = false,
+  loading = false,
+  fullWidth = false,
   className,
   ...props
 }: PxButtonProps) {
   return (
     <button
       onClick={onClick}
-      disabled={disabled}
+      disabled={disabled || loading}
       {...props}
       className={clsx(
         'clip-px shadow-px border-px font-pixel transition-all duration-200',
@@ -43,13 +47,23 @@ export function PxButton({
           'px-px-2 py-2 text-sm': size === 'md', 
           'px-px-3 py-3 text-base': size === 'lg',
           
-          // Disabled
-          'opacity-50 cursor-not-allowed hover:translate-x-0 hover:translate-y-0 hover:shadow-px': disabled,
+          // Disabled and loading states
+          'opacity-50 cursor-not-allowed hover:translate-x-0 hover:translate-y-0 hover:shadow-px': disabled || loading,
+          
+          // Full width
+          'w-full': fullWidth,
         },
         className
       )}
     >
-      {children}
+      {loading ? (
+        <span className="inline-flex items-center gap-2">
+          <span className="animate-spin">⏳</span>
+          {children}
+        </span>
+      ) : (
+        children
+      )}
     </button>
   );
 }

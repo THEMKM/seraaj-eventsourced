@@ -16,17 +16,14 @@ export interface OnboardingData {
   email: string;
   location: string;
   bio: string;
-  interests: string[]; // general interests
+  interests: string[]; // activity types: Direct Service, Advocacy, Research, etc.
   skills: string[];
-  causes: string[]; // cause areas
-  availability: {
-    weekdays: boolean;
-    weekends: boolean;
-    evenings: boolean;
-  };
+  causes: string[]; // cause areas: Education, Health, Environment, etc.
+  availability: string; // time commitment: "1-2", "3-5", "6-10", "10+" hours/week
   // org fields
   organizationName?: string;
-  organizationType?: string;
+  organizationType?: string; // nonprofit, charity, ngo, social-enterprise, community-group
+  organizationSize?: string; // 1-5, 6-20, 21-50, 50+
 }
 
 interface OnboardingFlowProps {
@@ -34,11 +31,13 @@ interface OnboardingFlowProps {
   onSkip?: () => void;
   initialEmail?: string;
   initialUserType?: UserType | null;
+  onStepSave?: (data: OnboardingData, stepIndex: number) => Promise<void> | void;
 }
 
-export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onSkip, initialEmail, initialUserType = null }) => {
+export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onSkip, initialEmail, initialUserType = null, onStepSave }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [savingStep, setSavingStep] = useState(false);
   const [data, setData] = useState<OnboardingData>({
     userType: initialUserType,
     name: '',
@@ -48,7 +47,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onSk
     interests: [],
     skills: [],
     causes: [],
-    availability: { weekdays: false, weekends: false, evenings: false },
+    availability: '',
   });
 
   const steps = useMemo(() => ([
@@ -63,6 +62,16 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onSk
 
   const handleNext = async () => {
     if (currentStep < steps.length - 1) {
+      if (onStepSave) {
+        setSavingStep(true);
+        try {
+          await onStepSave(data, currentStep);
+        } catch (e) {
+          console.warn('Onboarding step autosave failed:', e);
+        } finally {
+          setSavingStep(false);
+        }
+      }
       setCurrentStep(currentStep + 1);
     } else {
       setSubmitting(true);
@@ -88,14 +97,14 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onSk
       case 1: return data.userType !== null;
       case 2:
         if (data.userType === 'organization') {
-          return !!data.organizationName && !!data.location;
+          return !!data.organizationName && !!data.organizationType && !!data.location;
         }
         return !!data.name && !!data.email && !!data.location;
       case 3:
         if (data.userType === 'organization') {
           return data.causes.length > 0;
         }
-        return data.skills.length >= 1 && (data.availability.weekdays || data.availability.weekends || data.availability.evenings);
+        return data.skills.length >= 1 && data.interests.length >= 1 && data.availability !== '';
       case 4: return true;
       default: return false;
     }
@@ -135,8 +144,8 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onSk
               <PxButton variant="secondary" onClick={onSkip}>Skip</PxButton>
             )}
           </div>
-          <PxButton variant="primary" onClick={handleNext} disabled={!canProceed() || submitting}>
-            {currentStep === steps.length - 1 ? (submitting ? 'Saving...' : 'Complete') : 'Next'}
+          <PxButton variant="primary" onClick={handleNext} disabled={!canProceed() || submitting || savingStep}>
+            {currentStep === steps.length - 1 ? (submitting ? 'Saving...' : 'Complete') : (savingStep ? 'Saving...' : 'Next')}
           </PxButton>
         </div>
       </div>

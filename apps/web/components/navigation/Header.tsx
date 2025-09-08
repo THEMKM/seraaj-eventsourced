@@ -30,7 +30,29 @@ export function Header() {
 
           {/* Navigation */}
           <nav className="hidden md:flex items-center space-x-6">
-            {isAuthenticated && (
+            {isAuthenticated && user?.role === 'ORG_ADMIN' && (
+              <>
+                <Link 
+                  href="/organization/dashboard" 
+                  className="text-sm text-white hover:text-primary font-pixel transition-colors duration-200"
+                >
+                  Admin Dashboard
+                </Link>
+                <Link 
+                  href="/organization/opportunities" 
+                  className="text-sm text-white hover:text-primary font-pixel transition-colors duration-200"
+                >
+                  Opportunities
+                </Link>
+                <Link 
+                  href="/organization/opportunities/create" 
+                  className="text-sm text-white hover:text-primary font-pixel transition-colors duration-200"
+                >
+                  Create
+                </Link>
+              </>
+            )}
+            {isAuthenticated && user?.role !== 'ORG_ADMIN' && (
               <>
                 <Link 
                   href="/dashboard" 
